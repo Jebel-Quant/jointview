@@ -3,3 +3,12 @@ ref: "v1.3.3"
 
 profiles:
   - github-project
+
+# Destination paths the sync must not deliver. A directory entry covers everything
+# under it.
+exclude:
+  # The template's MARIMO.md and TESTS.md, dropped in #24 along with their mkdocs nav
+  # entries: this repo documents both subjects in CLAUDE.md and README.md instead, and
+  # a page mkdocs does not link to is a page nobody reads. Recorded here rather than
+  # simply deleted, because a deletion alone is undone by the next sync.
+  - docs/development
