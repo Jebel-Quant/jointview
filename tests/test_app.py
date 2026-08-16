@@ -67,8 +67,8 @@ def test_a_panel_says_so_when_there_is_too_little_to_summarise(notebook):
     and taking the whole page down with it.
     """
     _, defs = notebook
-    lonely = pl.Series("tech_fund", [100.0])
-    assert "too few" in defs["summary_table"](lonely, "tech_fund").text
+    lonely = pl.DataFrame({"period": [0], "a": [100.0]})
+    assert "too few" in defs["summary_table"](lonely, "a", "tech_fund").text
 
 
 def test_running_the_file_directly_starts_the_app():

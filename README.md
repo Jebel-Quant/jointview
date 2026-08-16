@@ -1,95 +1,78 @@
 # jointview
 
-A small [marimo](https://marimo.io) app for looking at two price or NAV series of a
-[Polars](https://pola.rs) DataFrame at once.
+Compare two price or NAV series of a [Polars](https://pola.rs) DataFrame, side by side.
 
-Every numeric column is a series you can pick, one on the left and one on the right.
-The middle holds both as two lines on one pair of axes; underneath each dropdown sits
-the summary of exactly the rows in that plot.
+[![PyPI version](https://badge.fury.io/py/jointview.svg)](https://pypi.org/project/jointview/)
 
-![jointview comparing two funds of the demo frame](https://raw.githubusercontent.com/Jebel-Quant/jointview/main/docs/assets/screenshot.png)
-
-Above is the generated demo frame, with `balanced` on the left and `tech_fund` on the
-right — two series that start thirty times apart.
-
-Both lines share one y-axis: a second scale would invent a relationship that is not
-in the data. So the default is to index both series to 100 at the first date they
-have in common, which is how a fund priced at 1.02 and one priced at 1,450 end up
-comparable. The switch above the plot turns that off when the levels already share a
-scale.
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
+[![Python versions](https://img.shields.io/badge/Python-3.11%20•%203.12%20•%203.13%20•%203.14-blue?logo=python)](https://www.python.org/)
+[![CI](https://github.com/Jebel-Quant/jointview/actions/workflows/rhiza_ci.yml/badge.svg?event=push)](https://github.com/Jebel-Quant/jointview/actions/workflows/rhiza_ci.yml)
+[![Coverage](https://jebel-quant.github.io/jointview/coverage-badge.svg)](https://jebel-quant.github.io/jointview/reports/html-coverage/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg?logo=ruff)](https://github.com/astral-sh/ruff)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![marimo](https://img.shields.io/badge/built%20with-marimo-1f7cff)](https://marimo.io)
+[![CodeFactor](https://www.codefactor.io/repository/github/jebel-quant/jointview/badge)](https://www.codefactor.io/repository/github/jebel-quant/jointview)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jebel-quant/jointview/badge)](https://scorecard.dev/viewer/?uri=github.com/jebel-quant/jointview)
+[![Rhiza](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FJebel-Quant%2Fjointview%2Fmain%2F.rhiza%2Ftemplate.yml&query=%24.ref&label=rhiza)](https://github.com/jebel-quant/rhiza)
+[![Downloads](https://static.pepy.tech/personalized-badge/jointview?period=month&units=international_system&left_color=black&right_color=orange&left_text=PyPI%20downloads%20per%20month)](https://pepy.tech/project/jointview)
 
 ## Run it
 
-There is nothing to install: the app ships with the package, and `uvx` fetches both
-for the length of the run.
+```bash
+uvx jointview
+```
+
+That is the whole installation. `uvx` fetches the package and its dependencies for the
+length of the run and leaves nothing behind.
 
 ```bash
-uvx jointview                            # generated demo frame
 uvx jointview navs.parquet               # your own data
 uvx jointview navs.parquet --height 900  # taller plot for a taller screen
 ```
 
-Until the package is on PyPI, point `uvx` at the repository — or at a checkout of it:
+![jointview comparing two funds of the demo frame](https://raw.githubusercontent.com/Jebel-Quant/jointview/main/docs/assets/screenshot.png)
 
-```bash
-uvx --from git+https://github.com/jebel-quant/jointview jointview navs.parquet
-uv run jointview navs.parquet            # from a clone
-uv run jointview --edit                  # open the notebook itself
-```
+Pick a series on each side. Both are drawn on one pair of axes, and each summary table
+describes exactly the rows in the plot — the *common sample*, where both series are
+present.
 
-`--edit` only makes sense from a clone: it opens the notebook marimo is serving, and
-under `uvx` that is a copy in a throwaway environment.
+## Why both lines share an axis
 
-Arguments after a bare `--` belong to marimo rather than to the app, which is how the
-server itself is configured:
+A second scale would invent a relationship that is not in the data. So both series are
+indexed to 100 at their first shared date, which is how a fund priced at 49 and one
+priced at 1,450 become comparable. The switch above the plot turns that off when the
+levels already share a scale.
 
-```bash
-uvx jointview navs.parquet -- --port 8080 --headless
-```
-
-The plot takes the full width of the window and the tables sit either side of it. Its
-height is the one thing the page cannot work out for itself — 700px suits a laptop, and
-`--height` is there for a monitor that has more to give.
-
-The file reads as `.parquet`, `.csv`, `.tsv`, `.json`, `.ndjson`, `.arrow`, `.ipc` and
-`.feather`. The first temporal column becomes the x-axis; without one the rows are
-numbered. Every numeric column is offered as a series. Given no file you get
-`jointview.data.demo_frame()`: daily NAVs for six made-up funds that share a market
-factor and start anywhere between 1 and 1,450.
-
-## The summary
-
-Both tables are computed from the *common sample* — the dates where both series are
-present — so the numbers always describe the lines you are looking at.
+## Options
 
 | | |
-|:---|---:|
-| Observations, Start, End | the extent of the series |
-| Total return, Annual return | `end/start`, and the same compounded to a year |
-| Annual volatility, Sharpe ratio | of the period returns, at 252 periods a year, cash at zero |
-| Max drawdown | the deepest fall below the running peak |
-| Hit rate, Best period, Worst period | the shape of the period returns |
+|:---|:---|
+| `jointview` | the generated demo frame |
+| `jointview <file>` | `.parquet`, `.csv`, `.tsv`, `.json`, `.ndjson`, `.arrow`, `.ipc`, `.feather` |
+| `--height` | plot height in pixels (default 700) |
+| `--edit` | open the notebook itself, from a clone |
+| `-- …` | everything after a bare `--` goes to marimo: `-- --port 8080 --headless` |
 
-A figure that cannot be formed — a Sharpe ratio for a flat series, a growth rate for
-a series that starts at zero — shows as `—` rather than blanking the table.
+The first temporal column becomes the x-axis; without one the rows are numbered. Every
+numeric column is offered as a series.
 
-## Use the pieces on their own
+## The pieces on their own
 
-Neither the chart nor the statistics need marimo:
+Neither the chart nor the statistics need marimo. Statistics come from
+[jQuantStats](https://github.com/jebel-quant/jquantstats), so the frame carries its
+period column into `summary` — the annualisation factor is read from the spacing of the
+observations rather than assumed.
 
 ```python
-import polars as pl
-from jointview import line_chart, summary, metrics
+from jointview import demo_frame, line_chart, metrics, summary
 
-frame = pl.read_parquet("navs.parquet")
-line_chart(frame, "tech_fund", "balanced").save("lines.html")
+frame = demo_frame()
 
-summary(frame["tech_fund"])              # a formatted two-column frame
-metrics(frame["tech_fund"])["Sharpe ratio"]   # the raw number
+summary(frame, "balanced", date_col="date")                  # a formatted two-column frame
+metrics(frame, "tech_fund", date_col="date")["Sharpe ratio"]  # the raw number
+chart = line_chart(frame, "balanced", "tech_fund")            # a plain Altair chart
 ```
 
-`line_chart` is a plain Altair chart: two 2px lines, a legend and a label at the end
-of each line, and a crosshair that reads both series at the hovered date. Curves
-longer than `max_points` (4,000 by default) are thinned by a fixed stride — the last
-point always survives, so the endpoints and the summary agree.
-
+Seventeen figures per series — returns, volatility, Sharpe, Sortino, Calmar, drawdown,
+Ulcer index, value at risk, and the shape of the period returns. A figure that cannot be
+formed shows as `—` rather than blanking the table.

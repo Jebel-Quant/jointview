@@ -26,17 +26,39 @@ PERIOD = "period"
 
 
 def series_columns(frame: pl.DataFrame) -> list[str]:
-    """The columns that can be drawn: every numeric one."""
+    """The columns that can be drawn: every numeric one.
+
+    >>> import datetime as dt, polars as pl
+    >>> frame = pl.DataFrame({"date": [dt.date(2024, 1, 1)], "nav": [1.0], "label": ["a"]})
+    >>> series_columns(frame)
+    ['nav']
+    """
     return [name for name, dtype in frame.schema.items() if dtype.is_numeric()]
 
 
 def date_column(frame: pl.DataFrame) -> str | None:
-    """The first temporal column, which becomes the x-axis. None means row number."""
+    """The first temporal column, which becomes the x-axis. None means row number.
+
+    >>> import datetime as dt, polars as pl
+    >>> date_column(pl.DataFrame({"when": [dt.date(2024, 1, 1)], "nav": [1.0]}))
+    'when'
+    >>> date_column(pl.DataFrame({"nav": [1.0]})) is None
+    True
+    """
     return next((name for name, dtype in frame.schema.items() if dtype.is_temporal()), None)
 
 
 def default_pair(frame: pl.DataFrame) -> tuple[int, int]:
-    """Indices into :func:`series_columns` to open on — the first two series."""
+    """Indices into :func:`series_columns` to open on — the first two series.
+
+    A frame with a single series opens on it twice, rather than refusing to draw.
+
+    >>> import polars as pl
+    >>> default_pair(pl.DataFrame({"a": [1.0], "b": [2.0]}))
+    (0, 1)
+    >>> default_pair(pl.DataFrame({"only": [1.0]}))
+    (0, 0)
+    """
     names = series_columns(frame)
     if not names:
         raise ValueError("frame has no numeric columns to plot")  # noqa: TRY003
