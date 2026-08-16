@@ -15,9 +15,6 @@ docs_dir: docs
 nav:
   - Home: index.md
   - API Reference: api.md
-  - Development:
-      - Marimo Notebooks: development/MARIMO.md
-      - Tests: development/TESTS.md
   # Written by `make book`, which copies _tests/ to docs/reports/ before building.
   - Reports:
       - Test Report: reports/html-report/report.html
