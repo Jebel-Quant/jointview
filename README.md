@@ -73,10 +73,26 @@ from jointview import demo_frame, line_chart, metrics, summary
 
 frame = demo_frame()
 
-summary(frame, "balanced", date_col="date")                  # a formatted two-column frame
-metrics(frame, "tech_fund", date_col="date")["Sharpe ratio"]  # the raw number
-chart = line_chart(frame, "balanced", "tech_fund")            # a plain Altair chart
+table = summary(frame, "balanced", date_col="date")                    # a formatted two-column frame
+sharpe = metrics(frame, "tech_fund", date_col="date")["Sharpe ratio"]  # the raw number
+chart = line_chart(frame, "balanced", "tech_fund")                     # a plain Altair chart
+
+print(table.columns, table.height, dict(table.iter_rows())["Max drawdown"])
+print(f"{sharpe:.2f}")
+print(type(chart).__name__)
 ```
+
+```result
+['metric', 'value'] 17 -15.90%
+0.52
+LayerChart
+```
+
+One line per claim above, in the same order — the table is two columns of formatted
+strings, the metric is a bare float, and the chart is Altair's own type rather than a
+marimo widget. The block is executed on every commit and its output compared against the
+result printed here, so a figure that drifts is a failing test rather than a stale
+README.
 
 Seventeen figures per series — returns, volatility, Sharpe, Sortino, Calmar, drawdown,
 Ulcer index, value at risk, and the shape of the period returns. A figure that cannot be
