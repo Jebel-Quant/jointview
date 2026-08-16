@@ -47,6 +47,23 @@ def line_frame(
 
     Wide rather than long, because the crosshair reads every series at the hovered
     period out of a single row.
+
+    >>> import polars as pl
+    >>> frame = pl.DataFrame({"cash": [1.0, 1.01, 1.02], "balanced": [1450.0, 1479.0, 1465.0]})
+    >>> drawn = line_frame(frame, "cash", "balanced")
+    >>> drawn.columns
+    ['period', 'cash', 'balanced']
+
+    Rebasing is what lets those two share a y-axis at all: both leave the first
+    period at ``base``, whatever they were priced at.
+
+    >>> round(drawn["cash"][0], 6), round(drawn["balanced"][0], 6)
+    (100.0, 100.0)
+
+    A column against itself is one line rather than two identical ones:
+
+    >>> line_frame(frame, "cash", "cash").columns
+    ['period', 'cash']
     """
     data = aligned(frame, a, b)
     names = [a] if a == b else [a, b]

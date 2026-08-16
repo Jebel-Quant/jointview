@@ -37,7 +37,22 @@ FUNDS: dict[str, tuple[float, float, float, float]] = {
 
 
 def load_frame(path: str | Path | None) -> pl.DataFrame:
-    """Read a DataFrame from ``path``, or build the demo frame when it is None."""
+    """Read a DataFrame from ``path``, or build the demo frame when it is None.
+
+    The suffix picks the reader, so no path means the generated frame rather than
+    an error — which is what makes ``marimo run app.py`` work with no arguments:
+
+    >>> load_frame(None).columns[0]
+    'date'
+
+    A path that is not there is reported before a reader is chosen, so the message
+    names the file rather than complaining about its extension:
+
+    >>> load_frame("nowhere.parquet")
+    Traceback (most recent call last):
+        ...
+    FileNotFoundError: no such file: nowhere.parquet
+    """
     if path is None or path == "":
         return demo_frame()
 

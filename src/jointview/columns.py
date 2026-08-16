@@ -64,6 +64,24 @@ def aligned(frame: pl.DataFrame, a: str, b: str) -> pl.DataFrame:
     Both the picture and the summary tables are built from this, so the numbers
     beside the chart always describe the lines in it. Renaming also sidesteps
     Vega-Lite's field-shorthand escaping and lets ``a`` and ``b`` be the same column.
+
+    The three names are fixed whatever the columns were called, the rows come out
+    sorted by period, and a date where either series is missing is not part of the
+    sample — here the frame arrives unsorted and with a gap on the 2nd:
+
+    >>> import datetime as dt, polars as pl
+    >>> frame = pl.DataFrame(
+    ...     {
+    ...         "date": [dt.date(2024, 1, 3), dt.date(2024, 1, 1), dt.date(2024, 1, 2)],
+    ...         "x": [3.0, 1.0, None],
+    ...         "y": [30.0, 10.0, 20.0],
+    ...     }
+    ... )
+    >>> pair = aligned(frame, "x", "y")
+    >>> pair.columns
+    ['period', 'a', 'b']
+    >>> pair["a"].to_list()
+    [1.0, 3.0]
     """
     for column in (a, b):
         if column not in frame.columns:
