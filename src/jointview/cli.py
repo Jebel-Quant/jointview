@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import subprocess  # nosec B404 - launching marimo is what this module is for
+import subprocess  # nosec B404  # launching marimo is what this module is for
 import sys
 from pathlib import Path
 

@@ -126,14 +126,19 @@ def _(a_pick, aligned, b_pick, frame, line_chart, plot_height, rebase):
 def _(mo, summary_markdown):
     """The two pieces of furniture a side panel is made of."""
 
-    def summary_table(series, title):
-        """A metric table for ``series``, or a note when the common sample is too short."""
+    def summary_table(pair, side, title):
+        """A metric table for one side of ``pair``, or a note when the sample is too short.
+
+        The whole aligned frame goes in rather than the column alone: jQuantStats reads
+        the annualisation factor off the spacing of the period column, so the dates have
+        to travel with the levels.
+        """
         try:
-            return mo.md(summary_markdown(series, title=title))
-        except ValueError:
+            return mo.md(summary_markdown(pair, side, title=title))
+        except (ValueError, KeyError):
             return mo.md(f"**{title}** — too few overlapping observations to summarise.")
 
-    # A dropdown and eleven metrics: the panel is now the same height whatever the
+    # A dropdown and seventeen metrics: the panel is now the same height whatever the
     # frame holds, so it no longer needs the scroll box that a per-column radio list
     # did. The wide gap keeps the split legible — the dropdown is a control, the
     # table under it is a result, and they should not read as one column of text.
@@ -172,9 +177,9 @@ def _(a_column, a_pick, b_column, b_pick, figure, mo, pair, panel, summary_table
     """Lay out the page: a picker and its table either side of the figure."""
     mo.hstack(
         [
-            panel("left", a_pick, summary_table(pair["a"], a_column)),
+            panel("left", a_pick, summary_table(pair, "a", a_column)),
             figure,
-            panel("right", b_pick, summary_table(pair["b"], b_column)),
+            panel("right", b_pick, summary_table(pair, "b", b_column)),
         ],
         # The side panels hold a dropdown and a two-column table; anything wider than
         # that is width taken off the picture.

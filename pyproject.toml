@@ -19,6 +19,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "altair>=5.4",
+    "jquantstats>=0.10",
     "marimo>=0.13",
     "numpy>=1.26",
     "polars>=1.0",
@@ -36,6 +37,10 @@ test = ["pytest>=8.0", "pytest-cov>=5.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.check_test_layout]
+enforce = false
+reason = "tests are organised by behaviour, not by module — test_columns.py covers plot.py's column helpers alongside test_plot.py's chart building. Per-module coverage is guaranteed instead by the 100% coverage gate in COVERAGE_FAIL_UNDER."
 
 [project.urls]
 Homepage = "https://github.com/Jebel-Quant/jointview"
