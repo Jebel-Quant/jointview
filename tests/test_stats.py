@@ -14,6 +14,8 @@ import math
 import polars as pl
 import pytest
 
+import jointview.plot
+import jointview.stats
 from jointview.stats import MISSING, drawdown, metrics, returns, summary, summary_markdown
 
 
@@ -43,6 +45,18 @@ def bumpy():
 def flat():
     """A series that never moves — a cash line, and the one that divides by zero."""
     return framed([100.0] * 4)
+
+
+def test_the_summary_reads_the_column_aligned_writes():
+    """The default `date_col` is the column `aligned` produces, not a second literal.
+
+    These two halves of the package agree by construction — `stats` imports the name
+    from `plot`. The assertion is what fails if someone reintroduces a local copy: a
+    `KeyError` deep in the app is the alternative way to find out.
+    """
+    frame = pl.DataFrame({"date": [dt.date(2024, 1, 1), dt.date(2024, 1, 2)], "x": [1.0, 2.0]})
+    assert jointview.plot.PERIOD in jointview.plot.aligned(frame, "x", "x").columns
+    assert jointview.stats.PERIOD is jointview.plot.PERIOD
 
 
 def test_returns_are_period_over_period(steady):

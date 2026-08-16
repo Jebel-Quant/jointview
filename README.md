@@ -57,10 +57,16 @@ numeric column is offered as a series.
 
 ## The pieces on their own
 
-Neither the chart nor the statistics need marimo. Statistics come from
-[jQuantStats](https://github.com/jebel-quant/jquantstats), so the frame carries its
-period column into `summary` — the annualisation factor is read from the spacing of the
-observations rather than assumed.
+Neither the chart nor the statistics need marimo. `uvx` runs the app; to import the
+pieces, install the package from [PyPI](https://pypi.org/project/jointview/):
+
+```bash
+uv add jointview      # or: pip install jointview
+```
+
+Statistics come from [jQuantStats](https://github.com/jebel-quant/jquantstats), so the
+frame carries its period column into `summary` — the annualisation factor is read from
+the spacing of the observations rather than assumed.
 
 ```python
 from jointview import demo_frame, line_chart, metrics, summary

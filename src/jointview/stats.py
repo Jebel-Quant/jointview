@@ -20,10 +20,14 @@ from typing import TYPE_CHECKING
 import polars as pl
 from jquantstats.data import Data
 
+# The column `aligned` writes is the column these functions read, so the name is taken
+# from where it is written rather than spelled a second time here. plot.py does not
+# import this module, so nothing circular comes of it — and the alternative, two equal
+# literals in two files, fails only where the app joins them.
+from jointview.plot import PERIOD
+
 if TYPE_CHECKING:  # pragma: no cover
     from jquantstats._stats import Stats
-
-PERIOD = "period"
 
 MISSING = "—"
 
