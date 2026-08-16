@@ -11,6 +11,7 @@ APP = Path(__file__).with_name("app.py")
 
 
 def _parser() -> argparse.ArgumentParser:
+    """The app's own arguments — everything marimo's command line does not own."""
     parser = argparse.ArgumentParser(
         prog="jointview",
         description="Compare two price or NAV series of a table, side by side.",

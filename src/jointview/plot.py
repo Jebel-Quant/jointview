@@ -76,7 +76,7 @@ def line_frame(
     """
     data = aligned(frame, a, b)
     names = [a] if a == b else [a, b]
-    columns = [pl.col(source).alias(name) for source, name in zip("ab", names)]
+    columns = [pl.col(source).alias(name) for source, name in zip("ab", names, strict=False)]
     if rebase:
         columns = [column / column.first() * base for column in columns]
 
@@ -201,14 +201,12 @@ def _end_labels(wide: pl.DataFrame, names: list[str], x: alt.X) -> alt.LayerChar
     """
     last = wide.tail(1)
     order = sorted(names, key=lambda name: -float(last[name][0]))
-    dodge = dict(zip(order, (-8, 8))) if len(order) > 1 else {order[0]: 0}
+    dodge = dict(zip(order, (-8, 8), strict=False)) if len(order) > 1 else {order[0]: 0}
 
     return alt.layer(
         *(
             alt.Chart(last.select(PERIOD, pl.col(name).alias("value")))
-            .mark_text(
-                align="left", dx=8, dy=dodge[name], fontSize=11, fontWeight=600, color=CONTEXT
-            )
+            .mark_text(align="left", dx=8, dy=dodge[name], fontSize=11, fontWeight=600, color=CONTEXT)
             .encode(x, alt.Y("value", type="quantitative"), text=alt.value(name))
             for name in names
         )

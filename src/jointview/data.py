@@ -6,9 +6,9 @@ a generated frame so that ``marimo run app.py`` works out of the box.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import polars as pl

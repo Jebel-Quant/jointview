@@ -1,3 +1,10 @@
+"""The marimo notebook itself: two pickers, one chart, a summary table either side.
+
+Run it with the ``jointview`` command rather than opening this file — see
+:mod:`jointview.cli`, which starts marimo on this notebook and passes it ``--data``
+and ``--height``.
+"""
+
 import marimo
 
 __generated_with = "0.23.15"
@@ -6,13 +13,15 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
+    """Import marimo — the one cell every other cell here depends on."""
     import marimo as mo
 
     return (mo,)
 
 
 @app.cell
-def _(mo):
+def _(mo) -> None:
+    """Give the plot back the margins marimo reserves for prose."""
     # marimo pads a notebook for prose — 96px of side margin and 48px under the last
     # cell, twice over. This is a single-screen instrument, so those margins go back to
     # the plot. First cell so the trim is in the DOM before anything that sizes itself
@@ -36,6 +45,7 @@ def _(mo):
 
 @app.cell
 def _(mo):
+    """Load the frame, and settle the two things the command line gets a say in."""
     from jointview.data import load_frame
     from jointview.plot import aligned, default_pair, line_chart, series_columns
     from jointview.stats import summary_markdown
@@ -60,6 +70,7 @@ def _(mo):
 
 @app.cell
 def _(default_pair, frame, mo, names):
+    """Build the two series pickers, opened on a pair worth looking at."""
     a_start, b_start = default_pair(frame)
 
     # One dropdown is the whole selector: it holds its own value, so there is no
@@ -67,6 +78,7 @@ def _(default_pair, frame, mo, names):
     # of the panel whatever the frame is — a radio list grew with the column count,
     # and a wide parquet would have turned the side panels into a scroll.
     def _pick(start):
+        """One dropdown over every series, opened on the column at ``start``."""
         return mo.ui.dropdown(
             options=names,
             value=names[start],
@@ -85,6 +97,7 @@ def _(default_pair, frame, mo, names):
 
 @app.cell
 def _(mo):
+    """The only control over the plot itself: whether to index both series to 100."""
     # Two NAVs on one axis only mean something on a shared scale; off, the raw levels
     # are there for a pair that already shares one.
     rebase = mo.ui.switch(value=True, label="index both to 100")
@@ -93,6 +106,7 @@ def _(mo):
 
 @app.cell
 def _(a_pick, aligned, b_pick, frame, line_chart, plot_height, rebase):
+    """Read the pickers, and derive everything the layout below draws."""
     a_column = a_pick.value
     b_column = b_pick.value
     pair = aligned(frame, a_column, b_column)
@@ -102,7 +116,10 @@ def _(a_pick, aligned, b_pick, frame, line_chart, plot_height, rebase):
 
 @app.cell
 def _(mo, summary_markdown):
+    """The two pieces of furniture a side panel is made of."""
+
     def summary_table(series, title):
+        """A metric table for ``series``, or a note when the common sample is too short."""
         try:
             return mo.md(summary_markdown(series, title=title))
         except ValueError:
@@ -113,6 +130,7 @@ def _(mo, summary_markdown):
     # did. The wide gap keeps the split legible — the dropdown is a control, the
     # table under it is a result, and they should not read as one column of text.
     def panel(label, picker, table):
+        """One side of the page: a heading, its picker, and the table underneath."""
         return mo.vstack(
             [
                 mo.md(f"**{label}**"),
@@ -126,6 +144,7 @@ def _(mo, summary_markdown):
 
 @app.cell
 def _(a_column, b_column, chart, frame, mo, pair, rebase):
+    """The middle column: the switch, the chart, and a line saying what it is of."""
     _dropped = frame.height - pair.height
     _note = f" of {frame.height:,}" if _dropped else ""
     caption = mo.md(
@@ -139,7 +158,8 @@ def _(a_column, b_column, chart, frame, mo, pair, rebase):
 
 
 @app.cell
-def _(a_column, a_pick, b_column, b_pick, figure, mo, pair, panel, summary_table):
+def _(a_column, a_pick, b_column, b_pick, figure, mo, pair, panel, summary_table) -> None:
+    """Lay out the page: a picker and its table either side of the figure."""
     mo.hstack(
         [
             panel("left", a_pick, summary_table(pair["a"], a_column)),

@@ -56,9 +56,7 @@ def metrics(levels: pl.Series, *, periods_per_year: int = PERIODS_PER_YEAR) -> d
         "Total return": growth - 1.0,
         "Annual return": growth ** (1.0 / years) - 1.0 if growth > 0 else math.nan,
         "Annual volatility": volatility,
-        "Sharpe ratio": float(period.mean()) * periods_per_year / volatility
-        if volatility
-        else math.nan,
+        "Sharpe ratio": float(period.mean()) * periods_per_year / volatility if volatility else math.nan,
         "Max drawdown": float(drawdown(values).min()),
         "Hit rate": float((period > 0).mean()),
         "Best period": float(period.max()),
@@ -94,9 +92,7 @@ def summary(levels: pl.Series, *, periods_per_year: int = PERIODS_PER_YEAR) -> p
     )
 
 
-def summary_markdown(
-    levels: pl.Series, *, title: str | None = None, periods_per_year: int = PERIODS_PER_YEAR
-) -> str:
+def summary_markdown(levels: pl.Series, *, title: str | None = None, periods_per_year: int = PERIODS_PER_YEAR) -> str:
     """A two-column markdown table, ready for ``mo.md``."""
     table = summary(levels, periods_per_year=periods_per_year)
     header = f"| {title or levels.name} | |", "|:---|---:|"
@@ -105,10 +101,17 @@ def summary_markdown(
 
 
 def _format(name: str, value: float) -> str:
+    """Render one metric, falling back to ``MISSING`` for anything not finite.
+
+    A NaN here is a figure that could not be formed rather than a bug — a Sharpe
+    ratio without volatility, a growth rate from a start of zero — so it shows as
+    a dash instead of blanking the row.
+    """
     if not math.isfinite(value):
         return MISSING
     return FORMATS.get(name, "{:,.4g}").format(value)
 
 
 def _clean(levels: pl.Series) -> pl.Series:
+    """Drop the gaps and settle on one dtype, so the arithmetic below has neither to think about."""
     return levels.drop_nulls().cast(pl.Float64)
