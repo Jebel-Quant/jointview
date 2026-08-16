@@ -54,8 +54,9 @@ def _(mo) -> None:
 @app.cell
 def _(mo):
     """Load the frame, and settle the two things the command line gets a say in."""
+    from jointview.columns import aligned, default_pair, series_columns
     from jointview.data import load_frame
-    from jointview.plot import aligned, default_pair, line_chart, series_columns
+    from jointview.plot import line_chart
     from jointview.stats import summary_markdown
 
     # jointview navs.parquet --height 900

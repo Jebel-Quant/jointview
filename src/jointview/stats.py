@@ -21,10 +21,11 @@ import polars as pl
 from jquantstats.data import Data
 
 # The column `aligned` writes is the column these functions read, so the name is taken
-# from where it is written rather than spelled a second time here. plot.py does not
-# import this module, so nothing circular comes of it — and the alternative, two equal
-# literals in two files, fails only where the app joins them.
-from jointview.plot import PERIOD
+# from where it is written rather than spelled a second time here — two equal literals
+# in two files fail only where the app joins them. It comes from `columns`, which owns
+# the contract, rather than from `plot`: drawing and summarising are two things done
+# to the same frame, and neither should have to import the other to name a column.
+from jointview.columns import PERIOD
 
 if TYPE_CHECKING:  # pragma: no cover
     from jquantstats._stats import Stats

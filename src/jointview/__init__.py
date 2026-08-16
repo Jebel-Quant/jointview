@@ -1,14 +1,8 @@
 """Compare two price or NAV series of a Polars DataFrame side by side."""
 
+from jointview.columns import aligned, date_column, default_pair, series_columns
 from jointview.data import demo_frame, load_frame
-from jointview.plot import (
-    aligned,
-    date_column,
-    default_pair,
-    line_chart,
-    line_frame,
-    series_columns,
-)
+from jointview.plot import line_chart, line_frame
 from jointview.stats import drawdown, metrics, returns, summary, summary_markdown
 
 __all__ = [

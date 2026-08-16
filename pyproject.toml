@@ -40,7 +40,7 @@ testpaths = ["tests"]
 
 [tool.check_test_layout]
 enforce = false
-reason = "tests are organised by behaviour, not by module — test_columns.py covers plot.py's column helpers alongside test_plot.py's chart building. Per-module coverage is guaranteed instead by the full coverage gate in COVERAGE_FAIL_UNDER. Keep this string free of literal percent signs: radon reads the file through configparser, which reads them as interpolation syntax and raises."
+reason = "tests sit flat in tests/, one file per module, rather than mirroring the package path the checker looks for at tests/jointview/. Per-module coverage is guaranteed instead by the full coverage gate in COVERAGE_FAIL_UNDER. Keep this string free of literal percent signs: radon reads the file through configparser, which reads them as interpolation syntax and raises."
 
 [project.urls]
 Homepage = "https://github.com/Jebel-Quant/jointview"
