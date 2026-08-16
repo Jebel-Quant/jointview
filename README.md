@@ -7,15 +7,10 @@ Every numeric column is a series you can pick, one on the left and one on the ri
 The middle holds both as two lines on one pair of axes; underneath each dropdown sits
 the summary of exactly the rows in that plot.
 
-```
-┌──────────┬───────────────────────────┬──────────┐
-│ left     │      two-line chart       │ right    │
-│ dropdown │   (indexed to 100)        │ dropdown │
-│ ─────────│                           │──────────│
-│ summary  │                           │ summary  │
-│ table    │                           │ table    │
-└──────────┴───────────────────────────┴──────────┘
-```
+![jointview comparing two funds of the demo frame](https://raw.githubusercontent.com/Jebel-Quant/jointview/main/docs/assets/screenshot.png)
+
+Above is the generated demo frame, with `balanced` on the left and `tech_fund` on the
+right — two series that start thirty times apart.
 
 Both lines share one y-axis: a second scale would invent a relationship that is not
 in the data. So the default is to index both series to 100 at the first date they
