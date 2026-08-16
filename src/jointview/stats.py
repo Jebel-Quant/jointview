@@ -40,7 +40,7 @@ def metrics(levels: pl.Series, *, periods_per_year: int = PERIODS_PER_YEAR) -> d
     """
     values = _clean(levels)
     if values.len() < 2:
-        raise ValueError("need at least two observations to summarise a series")
+        raise ValueError("need at least two observations to summarise a series")  # noqa: TRY003
 
     first, last = float(values[0]), float(values[-1])
     steps = values.len() - 1

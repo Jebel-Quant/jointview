@@ -113,7 +113,7 @@ def test_a_missing_file_fails_before_anything_is_started(monkeypatch, tmp_path):
 
     def fail(argv):  # pragma: no cover - the point is that it is never reached
         """Fail the test if the CLI tries to launch marimo at all."""
-        raise AssertionError("marimo should not have been started")
+        raise AssertionError("marimo should not have been started")  # noqa: TRY003
 
     monkeypatch.setattr(cli.subprocess, "call", fail)
     with pytest.raises(SystemExit) as error:

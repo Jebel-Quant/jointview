@@ -39,7 +39,7 @@ def default_pair(frame: pl.DataFrame) -> tuple[int, int]:
     """Indices into :func:`series_columns` to open on — the first two series."""
     names = series_columns(frame)
     if not names:
-        raise ValueError("frame has no numeric columns to plot")
+        raise ValueError("frame has no numeric columns to plot")  # noqa: TRY003
     return 0, 1 if len(names) > 1 else 0
 
 
@@ -52,9 +52,9 @@ def aligned(frame: pl.DataFrame, a: str, b: str) -> pl.DataFrame:
     """
     for column in (a, b):
         if column not in frame.columns:
-            raise KeyError(f"no column {column!r} in frame")
+            raise KeyError(f"no column {column!r} in frame")  # noqa: TRY003
         if not frame.schema[column].is_numeric():
-            raise TypeError(f"column {column!r} is {frame.schema[column]}, which cannot be drawn")
+            raise TypeError(f"column {column!r} is {frame.schema[column]}, which cannot be drawn")  # noqa: TRY003
 
     date = date_column(frame)
     period = pl.col(date).alias(PERIOD) if date else pl.int_range(pl.len()).alias(PERIOD)

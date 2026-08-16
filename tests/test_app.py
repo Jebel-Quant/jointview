@@ -72,5 +72,5 @@ def test_a_panel_says_so_when_there_is_too_little_to_summarise(notebook):
 
 
 def test_running_the_file_directly_starts_the_app():
-    """marimo's own ``__main__`` guard — ``cli.APP`` is the very file the CLI launches."""
+    """Marimo's own ``__main__`` guard — ``cli.APP`` is the very file the CLI launches."""
     runpy.run_path(str(cli.APP), run_name="__main__")

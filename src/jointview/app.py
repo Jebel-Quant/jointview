@@ -156,7 +156,9 @@ def _(a_column, b_column, chart, frame, mo, pair, rebase):
     _dropped = frame.height - pair.height
     _note = f" of {frame.height:,}" if _dropped else ""
     caption = mo.md(
-        f"`{a_column}` × `{b_column}` — {pair.height:,}{_note} dates where both series "
+        # The multiplication sign is the character this means; a lowercase x beside two
+        # column names reads as part of one of them.
+        f"`{a_column}` × `{b_column}` — {pair.height:,}{_note} dates where both series "  # noqa: RUF001
         "are present, which is also what the tables summarise."
     )
     # No align= here: centring would shrink the stack to its content and hand the chart

@@ -43,12 +43,12 @@ def load_frame(path: str | Path | None) -> pl.DataFrame:
 
     file = Path(path).expanduser()
     if not file.exists():
-        raise FileNotFoundError(f"no such file: {file}")
+        raise FileNotFoundError(f"no such file: {file}")  # noqa: TRY003
 
     reader = READERS.get(file.suffix.lower())
     if reader is None:
         supported = ", ".join(sorted(READERS))
-        raise ValueError(f"cannot read {file.suffix or file.name!r}; supported: {supported}")
+        raise ValueError(f"cannot read {file.suffix or file.name!r}; supported: {supported}")  # noqa: TRY003
 
     return reader(file)
 
