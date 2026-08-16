@@ -75,13 +75,21 @@ is generated, so treat it as the authority rather than this table.
 **Template-owned — do not edit here.** Changes are made upstream at `jebel-quant/rhiza`
 and arrive via `/rhiza:update`; edits made locally are overwritten by the next sync.
 
-- `.rhiza/` in its entirety, including `.rhiza/rhiza.mk` and `.rhiza/tests/`
+- `.rhiza/` in its entirety, including `.rhiza/rhiza.mk` and `.rhiza/tests/` — except
+  `.rhiza/template.yml`, which is the repo's own pointer at the template and is the one
+  file the sync will never overwrite
 - `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.3.3`
 - `.pre-commit-config.yaml`, `pytest.ini`, `ruff.toml`
-- `docs/mkdocs-base.yml`
+- `docs/mkdocs-base.yml`, `docs/index.md`
 
 **Repo-owned — edit freely.** `src/`, `tests/`, `pyproject.toml`, `README.md`,
-`mkdocs.yml`, `docs/index.md`, `docs/api.md`, `.rhiza/template.yml`, and this file.
+`mkdocs.yml`, `docs/api.md`, `.rhiza/template.yml`, and this file.
+
+**Declining a synced file takes more than deleting it** — the next sync writes it back.
+`exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
+a directory entry covering everything beneath it. `docs/development/` is the standing
+case: the template's `MARIMO.md` and `TESTS.md` were dropped in #24, and the exclusion
+is what keeps them dropped.
 
 `Makefile` is a four-line shim: it sets two variables, includes `.rhiza/rhiza.mk`, and
 optionally includes a gitignored `local.mk`. Put local targets in `local.mk`.
