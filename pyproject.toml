@@ -19,7 +19,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "altair>=5.4",
-    "jquantstats>=0.10",
+    "jquantstats>=0.10,<=1.0",
     "marimo>=0.13",
     "numpy>=1.26",
     "polars>=1.0",

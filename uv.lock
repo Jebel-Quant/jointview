@@ -377,7 +377,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=5.4" },
-    { name = "jquantstats", specifier = ">=0.10" },
+    { name = "jquantstats", specifier = ">=0.10,<=1.0" },
     { name = "marimo", specifier = ">=0.13" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "polars", specifier = ">=1.0" },
