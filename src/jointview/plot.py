@@ -11,6 +11,7 @@ this, in :mod:`jointview.columns`.
 
 from __future__ import annotations
 
+import math
 from typing import Literal, cast
 
 import altair as alt
@@ -64,14 +65,16 @@ def line_frame(
 
     >>> line_frame(frame, "cash", "cash").columns
     ['period', 'cash']
-    """
-    data = aligned(frame, a, b)
-    names = [a] if a == b else [a, b]
-    columns = [pl.col(source).alias(name) for source, name in zip("ab", names, strict=False)]
-    if rebase:
-        columns = [column / column.first() * base for column in columns]
 
-    return _thin(data.select(PERIOD, *columns), max_points)
+    A series starting at zero cannot be indexed — a cumulative P&L curve starts there
+    by construction — so the pair keeps its own levels instead:
+
+    >>> pnl = pl.DataFrame({"strategy": [0.0, 5.0, 3.0], "benchmark": [0.0, 2.0, 4.0]})
+    >>> line_frame(pnl, "strategy", "benchmark")["strategy"].to_list()
+    [0.0, 5.0, 3.0]
+    """
+    wide, _ = _wide(frame, a, b, rebase=rebase, base=base, max_points=max_points)
+    return wide
 
 
 def line_chart(
@@ -91,14 +94,18 @@ def line_chart(
     gives it, which is the point of a full-width app. Height stays a number, because
     nothing in the page has a height for a chart to follow — 700 fills a laptop window
     once the notebook margins are out of the way, without spilling off a short one.
+
+    Asking to rebase a pair that cannot be indexed draws the raw levels, and the
+    y-axis says ``level`` rather than claiming otherwise — see :func:`_rebasable`.
     """
-    wide = line_frame(frame, a, b, rebase=rebase, base=base, max_points=max_points)
+    wide, rebased = _wide(frame, a, b, rebase=rebase, base=base, max_points=max_points)
     names = [name for name in wide.columns if name != PERIOD]
 
     date = date_column(frame)
     x_type: XType = "temporal" if date else "quantitative"
     x_title = date or "row"
-    y_title = f"indexed to {base:g}" if rebase else "level"
+    # `rebased`, not `rebase`: the title names what the numbers underneath actually are.
+    y_title = f"indexed to {base:g}" if rebased else "level"
     x = alt.X(PERIOD, type=x_type, title=x_title)
 
     # Made here rather than inside a layer because two of them share it: the crosshair
@@ -128,6 +135,53 @@ def line_chart(
             autosize=_autosize(width, height),
         )
     )
+
+
+def _wide(
+    frame: pl.DataFrame,
+    a: str,
+    b: str,
+    *,
+    rebase: bool,
+    base: float,
+    max_points: int,
+) -> tuple[pl.DataFrame, bool]:
+    """The frame the chart is drawn from, and whether it ended up indexed after all.
+
+    One decision point for two callers. :func:`line_frame` wants the frame;
+    :func:`line_chart` wants the answer too, because an axis labelled "indexed to 100"
+    over unindexed levels is a wrong label rather than a missing one.
+    """
+    data = aligned(frame, a, b)
+    names = [a] if a == b else [a, b]
+    # `aligned` always writes both, so a column against itself takes only the first.
+    sources = ["a", "b"][: len(names)]
+    rebased = rebase and _rebasable(data, sources)
+
+    columns = [pl.col(source).alias(name) for source, name in zip(sources, names, strict=True)]
+    if rebased:
+        columns = [column / column.first() * base for column in columns]
+
+    return _thin(data.select(PERIOD, *columns), max_points), rebased
+
+
+def _rebasable(data: pl.DataFrame, sources: list[str]) -> bool:
+    """Whether dividing by the first value leaves a number for every series.
+
+    A first value of zero is not a broken frame — a cumulative P&L curve starts there
+    by construction — but dividing by it turns the rest of the line into infinities,
+    and Vega-Lite drops those silently. The reader picks two series, gets one, and
+    nothing on the plot says where the other went.
+
+    Answered for the pair together rather than per series. Indexing one to 100 while
+    the other kept its own units would put two unrelated scales on one axis, which is
+    the relationship this module exists in order not to invent.
+
+    A pair with no overlap has no first value to divide by, so there is nothing to
+    check and nothing to break: an empty frame comes out empty either way.
+    """
+    firsts = [value for row in data.head(1).select(sources).rows() for value in row]
+    return all(value != 0.0 and math.isfinite(value) for value in firsts)
 
 
 def _hover() -> alt.Parameter:

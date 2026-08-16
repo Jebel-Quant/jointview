@@ -44,6 +44,57 @@ def test_line_frame_rebasing_preserves_the_shape(frame):
     assert indexed["tech_fund"][-1] / 100.0 == pytest.approx(ratio)
 
 
+def test_line_frame_keeps_the_levels_when_a_series_starts_at_zero():
+    """Dividing by a first value of zero would leave a column of infinities.
+
+    Vega-Lite drops non-finite values, so the line would simply not be drawn — one
+    line where the reader picked two, with nothing on the plot to say so. A cumulative
+    P&L curve starts at zero by construction, so this is an ordinary frame rather than
+    a broken one, and the levels it already carries are the honest thing to show.
+    """
+    pnl = pl.DataFrame({"strategy": [0.0, 5.0, 3.0], "benchmark": [1.0, 2.0, 4.0]})
+    drawn = line_frame(pnl, "strategy", "benchmark")
+    assert drawn["strategy"].to_list() == [0.0, 5.0, 3.0]
+
+
+def test_line_frame_leaves_both_series_alone_when_only_one_starts_at_zero():
+    """The fallback covers the pair, because a half-rebased plot is the worse answer.
+
+    Indexing `benchmark` to 100 while `strategy` kept its own units would put two
+    unrelated scales on one axis under a title claiming a shared one — the exact
+    relationship the module refuses to invent.
+    """
+    pnl = pl.DataFrame({"strategy": [0.0, 5.0, 3.0], "benchmark": [50.0, 55.0, 60.0]})
+    assert line_frame(pnl, "strategy", "benchmark")["benchmark"][0] == pytest.approx(50.0)
+
+
+def test_line_frame_keeps_the_levels_when_a_series_starts_at_infinity():
+    """A non-finite first value fails the same way a zero does, and is caught with it."""
+    odd = pl.DataFrame({"broken": [float("inf"), 5.0, 3.0], "fine": [1.0, 2.0, 4.0]})
+    assert line_frame(odd, "broken", "fine")["fine"].to_list() == [1.0, 2.0, 4.0]
+
+
+def test_line_frame_survives_a_pair_that_never_overlaps():
+    """No common sample means no first value to divide by, and no crash reaching for one."""
+    disjoint = pl.DataFrame({"a": [1.0, None], "b": [None, 2.0]})
+    assert line_frame(disjoint, "a", "b").height == 0
+
+
+def test_line_chart_says_level_when_it_could_not_index(frame):
+    """The axis names what the numbers under it are, not what was asked for.
+
+    Falling back silently under a title reading "indexed to 100" would be a wrong
+    label rather than a missing one — worse than the bug it replaces.
+    """
+    pnl = pl.DataFrame({"strategy": [0.0, 5.0, 3.0], "benchmark": [0.0, 2.0, 4.0]})
+    spec = line_chart(pnl, "strategy", "benchmark", rebase=True).to_dict()
+    assert spec["layer"][1]["encoding"]["y"]["title"] == "level"
+    # The pair that can be indexed still says so, so the assertion above is about the
+    # fallback rather than about the title always reading "level".
+    indexed = line_chart(frame, "cash", "balanced", rebase=True).to_dict()
+    assert indexed["layer"][1]["encoding"]["y"]["title"] == "indexed to 100"
+
+
 def test_line_frame_draws_one_line_for_a_column_against_itself(frame):
     """A series against itself is one line, not two identical ones."""
     assert line_frame(frame, "cash", "cash").columns == ["period", "cash"]
