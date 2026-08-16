@@ -93,9 +93,3 @@ of each line, and a crosshair that reads both series at the hovered date. Curves
 longer than `max_points` (4,000 by default) are thinned by a fixed stride — the last
 point always survives, so the endpoints and the summary agree.
 
-## Develop
-
-```bash
-uv sync
-uv run pytest
-```
