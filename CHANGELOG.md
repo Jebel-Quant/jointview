@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and entries are generated from [Conventional Commits](https://www.conventionalcommits.org).
 
+## [0.3.1] - 2026-08-16
+
+### Documentation
+- Fix the API reference, and make something check it (#29)
+
+### Other Changes
+- Remove Development links from mkdocs navigation (#24)
+
 ## [0.3.0] - 2026-08-16
 
 ### New Features
