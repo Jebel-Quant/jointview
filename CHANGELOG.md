@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and entries are generated from [Conventional Commits](https://www.conventionalcommits.org).
 
+## [0.3.0] - 2026-08-16
+
+### New Features
+- [**breaking**] Compute the statistics with jQuantStats (#12)
+
+### Bug Fixes
+- The three findings from the quality run (#14, #15, #16) (#17)
+
+### Documentation
+- Show the app in the README (#6)
+
+### Other Changes
+- Remove development section from README (#7)
+- Remove OpenSSF Scorecard badge (#13)
+
 ## [0.2.0] - 2026-08-16
 
 ### Maintenance
