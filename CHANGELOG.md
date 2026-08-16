@@ -13,8 +13,15 @@ and entries are generated from [Conventional Commits](https://www.conventionalco
 ### Bug Fixes
 - The three findings from the quality run (#14, #15, #16) (#17)
 
+### Refactor
+- Separate the frame vocabulary from the chart building (#22) — `PERIOD` and the
+  column helpers move to a new `jointview.columns`, so `stats` no longer imports from
+  `plot`. Every name stays importable from `jointview`; the public API is unchanged.
+
 ### Documentation
 - Show the app in the README (#6)
+- Add a CLAUDE.md recording the module layout, the gates, and the template-owned
+  paths (#22)
 
 ### Other Changes
 - Remove development section from README (#7)

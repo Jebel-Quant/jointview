@@ -28,6 +28,11 @@ CONTEXT = "#8a8a84"
 BASE = 100.0
 MAX_POINTS = 4_000
 
+# Narrower than `str`, because altair's `type=` only accepts its four measurement kinds
+# and these are the two an x-axis of periods can be. Inside one function the literal was
+# inferred; passing it between them needs the type spelled out.
+XType = Literal["temporal", "quantitative"]
+
 
 def line_frame(
     frame: pl.DataFrame,
@@ -74,67 +79,22 @@ def line_chart(
     names = [name for name in wide.columns if name != PERIOD]
 
     date = date_column(frame)
-    x_type = "temporal" if date else "quantitative"
+    x_type: XType = "temporal" if date else "quantitative"
     x_title = date or "row"
     y_title = f"indexed to {base:g}" if rebase else "level"
-
-    long = wide.unpivot(index=PERIOD, variable_name="series", value_name="value")
     x = alt.X(PERIOD, type=x_type, title=x_title)
 
-    colour = alt.Color(
-        "series",
-        type="nominal",
-        title=None,
-        # Bound to the names, so picking a different pair never repaints a series that
-        # stayed on screen.
-        scale=alt.Scale(domain=names, range=list(SERIES[: len(names)])),
-        legend=alt.Legend(orient="top", offset=4, symbolType="stroke", symbolStrokeWidth=2),
-    )
-
-    # The `ty: ignore` here and below is altair's `mark_*` returning an unresolved
-    # TypeVar rather than a chart, so the checker cannot see `.encode` on it. It is a
-    # limitation of the stubs, not of the call — the same chain is what altair's own
-    # documentation shows.
-    lines = (
-        alt.Chart(long)  # ty: ignore[unresolved-attribute]
-        .mark_line(strokeWidth=2, clip=True)
-        .encode(
-            x,
-            # The levels frame the data; a zero baseline on a NAV is wasted panel.
-            alt.Y("value", type="quantitative", title=y_title, scale=alt.Scale(zero=False)),
-            colour,
-        )
-    )
-
-    # The crosshair finds the period; the tooltip then reads every series at it. Nobody
-    # can be asked to hover a 2px line.
-    hover = alt.selection_point(
-        name="hover",
-        fields=[PERIOD],
-        nearest=True,
-        on="pointerover",
-        clear="pointerout",
-        empty=False,
-    )
-    rule = (
-        alt.Chart(wide)  # ty: ignore[unresolved-attribute]
-        .mark_rule(color=CONTEXT, strokeWidth=1)
-        .encode(
-            x,
-            opacity=alt.condition(hover, alt.value(0.6), alt.value(0.0)),
-            tooltip=[
-                alt.Tooltip(PERIOD, type=x_type, title=x_title),
-                *(alt.Tooltip(name, type="quantitative", format=",.2f") for name in names),
-            ],
-        )
-        .add_params(hover)
-    )
-    markers = lines.mark_point(size=64, filled=True).encode(
-        opacity=alt.condition(hover, alt.value(1.0), alt.value(0.0))
-    )
-
+    # Made here rather than inside a layer because two of them share it: the crosshair
+    # carries the parameter, the markers only read it.
+    hover = _hover()
+    lines = _lines(wide, names, x, y_title)
     return (
-        alt.layer(rule, lines, markers, _end_labels(wide, names, x))
+        alt.layer(
+            _crosshair(wide, names, x, x_type, x_title, hover),
+            lines,
+            _markers(lines, hover),
+            _end_labels(wide, names, x),
+        )
         .resolve_scale(color="shared")
         .configure_axis(grid=True, gridOpacity=0.3, domain=False, labelPadding=4, tickSize=4)
         .configure_view(stroke=None)
@@ -150,6 +110,94 @@ def line_chart(
             # the gutter back; fitting spends the padding out of the size instead.
             autosize=_autosize(width, height),
         )
+    )
+
+
+def _hover() -> alt.Parameter:
+    """Which period the pointer is nearest, shared by the crosshair and the markers.
+
+    Nearest-point rather than a hit on the mark itself: nobody can be asked to hover a
+    2px line. It resolves to a period, not to a series, which is what lets one tooltip
+    report every line at that x.
+    """
+    return alt.selection_point(
+        name="hover",
+        fields=[PERIOD],
+        nearest=True,
+        on="pointerover",
+        clear="pointerout",
+        empty=False,
+    )
+
+
+def _lines(wide: pl.DataFrame, names: list[str], x: alt.X, y_title: str) -> alt.Chart:
+    """The series themselves — the layer everything else is chrome around.
+
+    Drawn from the long form, because one line per ``series`` value is what lets a
+    single colour encoding paint both.
+    """
+    long = wide.unpivot(index=PERIOD, variable_name="series", value_name="value")
+    colour = alt.Color(
+        "series",
+        type="nominal",
+        title=None,
+        # Bound to the names, so picking a different pair never repaints a series that
+        # stayed on screen.
+        scale=alt.Scale(domain=names, range=list(SERIES[: len(names)])),
+        legend=alt.Legend(orient="top", offset=4, symbolType="stroke", symbolStrokeWidth=2),
+    )
+    # The `ty: ignore` here and in the layers below is altair's `mark_*` returning an
+    # unresolved TypeVar rather than a chart, so the checker cannot see `.encode` on it.
+    # It is a limitation of the stubs, not of the call — the same chain is what altair's
+    # own documentation shows.
+    return (
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
+        .mark_line(strokeWidth=2, clip=True)
+        .encode(
+            x,
+            # The levels frame the data; a zero baseline on a NAV is wasted panel.
+            alt.Y("value", type="quantitative", title=y_title, scale=alt.Scale(zero=False)),
+            colour,
+        )
+    )
+
+
+def _crosshair(
+    wide: pl.DataFrame,
+    names: list[str],
+    x: alt.X,
+    x_type: XType,
+    x_title: str,
+    hover: alt.Parameter,
+) -> alt.Chart:
+    """The vertical rule under the pointer, carrying the tooltip for every series.
+
+    Drawn from the wide form: the tooltip reads all the series at the hovered period
+    out of a single row, which is the whole reason :func:`line_frame` is wide.
+    """
+    return (
+        alt.Chart(wide)  # ty: ignore[unresolved-attribute]
+        .mark_rule(color=CONTEXT, strokeWidth=1)
+        .encode(
+            x,
+            opacity=alt.condition(hover, alt.value(0.6), alt.value(0.0)),
+            tooltip=[
+                alt.Tooltip(PERIOD, type=x_type, title=x_title),
+                *(alt.Tooltip(name, type="quantitative", format=",.2f") for name in names),
+            ],
+        )
+        .add_params(hover)
+    )
+
+
+def _markers(lines: alt.Chart, hover: alt.Parameter) -> alt.Chart:
+    """A dot on each line at the hovered period — the lines' own marks, made visible.
+
+    Built off ``lines`` rather than from scratch so the points inherit its data and
+    colour encoding, and cannot drift from the curve they sit on.
+    """
+    return lines.mark_point(size=64, filled=True).encode(  # ty: ignore[unresolved-attribute]
+        opacity=alt.condition(hover, alt.value(1.0), alt.value(0.0))
     )
 
 
