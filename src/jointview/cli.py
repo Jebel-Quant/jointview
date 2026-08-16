@@ -99,7 +99,3 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         # Ctrl-C reached the child too; it has already said its goodbyes.
         return 130
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

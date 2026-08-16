@@ -5,6 +5,14 @@ Run it with the ``jointview`` command rather than opening this file — see
 and ``--height``.
 """
 
+# The cell signatures below are marimo's, not ours: it names every cell ``_``, derives
+# the parameters from what the cell reads, and rewrites both on save. Annotating them
+# would be annotating generated code that the next edit in the marimo editor throws
+# away — and the types are marimo's UI plumbing, so the annotations would be `Any`
+# anyway. Told to ruff here rather than in a config file, so the reason sits next to
+# the code it excuses. (ty asks for none of this; it does not require annotations.)
+# ruff: noqa: ANN001, ANN202
+
 import marimo
 
 __generated_with = "0.23.15"
@@ -16,7 +24,7 @@ def _():
     """Import marimo — the one cell every other cell here depends on."""
     import marimo as mo
 
-    return (mo,)
+    return (mo,)  # pragma: no cover
 
 
 @app.cell
@@ -40,7 +48,7 @@ def _(mo) -> None:
          the save/view-source menu, so it stays. */
     </style>
     """)
-    return
+    return  # pragma: no cover
 
 
 @app.cell
@@ -139,7 +147,7 @@ def _(mo, summary_markdown):
             gap=0.5,
         )
 
-    return panel, summary_table
+    return panel, summary_table  # pragma: no cover
 
 
 @app.cell
@@ -172,7 +180,7 @@ def _(a_column, a_pick, b_column, b_pick, figure, mo, pair, panel, summary_table
         align="start",
         gap=0.75,
     )
-    return
+    return  # pragma: no cover
 
 
 if __name__ == "__main__":

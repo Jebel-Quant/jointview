@@ -8,6 +8,7 @@ the same series around.
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import polars as pl
 
@@ -44,7 +45,7 @@ def metrics(levels: pl.Series, *, periods_per_year: int = PERIODS_PER_YEAR) -> d
     first, last = float(values[0]), float(values[-1])
     steps = values.len() - 1
     period = returns(values)
-    volatility = float(period.std(ddof=1) or 0.0) * math.sqrt(periods_per_year)
+    volatility = _number(period.std(ddof=1) or 0.0) * math.sqrt(periods_per_year)
 
     growth = last / first if first > 0 else math.nan
     years = steps / periods_per_year
@@ -56,11 +57,11 @@ def metrics(levels: pl.Series, *, periods_per_year: int = PERIODS_PER_YEAR) -> d
         "Total return": growth - 1.0,
         "Annual return": growth ** (1.0 / years) - 1.0 if growth > 0 else math.nan,
         "Annual volatility": volatility,
-        "Sharpe ratio": float(period.mean()) * periods_per_year / volatility if volatility else math.nan,
-        "Max drawdown": float(drawdown(values).min()),
-        "Hit rate": float((period > 0).mean()),
-        "Best period": float(period.max()),
-        "Worst period": float(period.min()),
+        "Sharpe ratio": _number(period.mean()) * periods_per_year / volatility if volatility else math.nan,
+        "Max drawdown": _number(drawdown(values).min()),
+        "Hit rate": _number((period > 0).mean()),
+        "Best period": _number(period.max()),
+        "Worst period": _number(period.min()),
     }
 
 
@@ -115,3 +116,14 @@ def _format(name: str, value: float) -> str:
 def _clean(levels: pl.Series) -> pl.Series:
     """Drop the gaps and settle on one dtype, so the arithmetic below has neither to think about."""
     return levels.drop_nulls().cast(pl.Float64)
+
+
+def _number(value: Any) -> float:
+    """One aggregate of a Float64 series, as the float it is.
+
+    Polars types its aggregations as a union of every scalar any series could yield —
+    dates, durations, strings. :func:`_clean` has already cast to ``Float64``, so the
+    only member that can arrive here is a number, and this is where that is said once
+    rather than at each of the six call sites.
+    """
+    return float(value)

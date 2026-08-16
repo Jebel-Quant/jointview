@@ -5,6 +5,7 @@ handed to marimo. That is the whole of the CLI's job: everything after it belong
 marimo and to the notebook.
 """
 
+import runpy
 import sys
 
 import pytest
@@ -135,3 +136,11 @@ def test_ctrl_c_is_not_a_traceback(monkeypatch):
 
     monkeypatch.setattr(cli.subprocess, "call", interrupt)
     assert cli.main([]) == 130
+
+
+def test_python_m_jointview_is_the_same_entry_point(monkeypatch):
+    """`python -m jointview` exits with what main() returned, and adds nothing of its own."""
+    monkeypatch.setattr(cli, "main", lambda: 7)
+    with pytest.raises(SystemExit) as error:
+        runpy.run_module("jointview", run_name="__main__")
+    assert error.value.code == 7
