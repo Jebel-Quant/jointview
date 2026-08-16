@@ -1,5 +1,7 @@
 """Getting a frame into the app — the generated demo one, and the file you pass it."""
 
+from pathlib import Path
+
 import polars as pl
 import pytest
 
@@ -66,6 +68,31 @@ def test_load_frame_reports_a_missing_file(tmp_path):
     """A typo in the path fails as a missing file, not as an empty frame."""
     with pytest.raises(FileNotFoundError):
         load_frame(tmp_path / "absent.parquet")
+
+
+def test_load_frame_reports_a_directory_as_one(tmp_path):
+    """A directory is named as a directory, not rejected for its extension.
+
+    The suffix lookup would otherwise call this an unsupported format, which sends
+    the reader looking for a typo in an extension that was never there.
+    """
+    with pytest.raises(IsADirectoryError, match="not a file"):
+        load_frame(tmp_path)
+
+
+def test_load_frame_says_something_useful_about_an_empty_path(tmp_path, monkeypatch):
+    """``Path("")`` is ``Path(".")``, so it arrives as the current directory.
+
+    The empty string is the "no path" sentinel and returns the demo frame; an empty
+    ``Path`` cannot be, because Python normalises it away at construction. The two
+    genuinely differ, and the guarantee is that neither ends in a message quoting an
+    empty name. Pinned because the directory branch is the only thing standing
+    between an empty Path and `cannot read ''`.
+    """
+    monkeypatch.chdir(tmp_path)
+    assert load_frame("").columns == demo_frame().columns
+    with pytest.raises(IsADirectoryError, match=r"not a file: \."):
+        load_frame(Path(""))
 
 
 def test_load_frame_reads_a_csv_of_navs(tmp_path):
