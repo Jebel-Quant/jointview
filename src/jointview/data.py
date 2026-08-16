@@ -52,13 +52,29 @@ def load_frame(path: str | Path | None) -> pl.DataFrame:
     Traceback (most recent call last):
         ...
     FileNotFoundError: no such file: nowhere.parquet
+
+    A directory is named as one. This is also where an empty ``Path`` lands, since
+    ``Path("")`` is ``Path(".")`` — the two are the same object by the time anything
+    here sees them, so the current directory is what actually arrived:
+
+    >>> load_frame(".")
+    Traceback (most recent call last):
+        ...
+    IsADirectoryError: not a file: .
     """
+    # Only the empty *string* is the "no path" sentinel: it is what marimo hands over
+    # for a flag that was not passed. A Path cannot carry it — see the docstring.
     if path is None or path == "":
         return demo_frame()
 
     file = Path(path).expanduser()
     if not file.exists():
         raise FileNotFoundError(f"no such file: {file}")  # noqa: TRY003
+
+    # Before the suffix lookup, which would otherwise reject a directory for having
+    # the wrong extension — and an empty one for having no name to quote at all.
+    if file.is_dir():
+        raise IsADirectoryError(f"not a file: {file}")  # noqa: TRY003
 
     reader = READERS.get(file.suffix.lower())
     if reader is None:
