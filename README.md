@@ -12,7 +12,6 @@ Compare two price or NAV series of a [Polars](https://pola.rs) DataFrame, side b
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![marimo](https://img.shields.io/badge/built%20with-marimo-1f7cff)](https://marimo.io)
 [![CodeFactor](https://www.codefactor.io/repository/github/jebel-quant/jointview/badge)](https://www.codefactor.io/repository/github/jebel-quant/jointview)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/jebel-quant/jointview/badge)](https://scorecard.dev/viewer/?uri=github.com/jebel-quant/jointview)
 [![Rhiza](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FJebel-Quant%2Fjointview%2Fmain%2F.rhiza%2Ftemplate.yml&query=%24.ref&label=rhiza)](https://github.com/jebel-quant/rhiza)
 [![Downloads](https://static.pepy.tech/personalized-badge/jointview?period=month&units=international_system&left_color=black&right_color=orange&left_text=PyPI%20downloads%20per%20month)](https://pepy.tech/project/jointview)
 
