@@ -13,15 +13,22 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
+# Every entry has to hand back a frame whose dates are dates. The binary formats carry
+# a schema and do it for free; the text ones cannot say that a column of "2024-01-01"
+# was ever anything but text, so each says here how it recovers them. It matters beyond
+# the x-axis: `stats` reads the annualisation factor off the spacing of the period
+# column, and a date column arriving as text costs a weekly series its real one.
 READERS: dict[str, Callable[[Path], pl.DataFrame]] = {
     ".arrow": pl.read_ipc,
-    ".csv": pl.read_csv,
+    ".csv": lambda p: pl.read_csv(p, try_parse_dates=True),
     ".feather": pl.read_ipc,
     ".ipc": pl.read_ipc,
-    ".json": pl.read_json,
-    ".ndjson": pl.read_ndjson,
+    # No try_parse_dates on the JSON readers — polars offers the hook for CSV only — so
+    # the same promotion is done on the way out instead.
+    ".json": lambda p: _with_dates(pl.read_json(p)),
+    ".ndjson": lambda p: _with_dates(pl.read_ndjson(p)),
     ".parquet": pl.read_parquet,
-    ".tsv": lambda p: pl.read_csv(p, separator="\t"),
+    ".tsv": lambda p: pl.read_csv(p, separator="\t", try_parse_dates=True),
 }
 
 # name: starting level, sensitivity to the common market move, daily drift of its
@@ -44,6 +51,10 @@ def load_frame(path: str | Path | None) -> pl.DataFrame:
 
     >>> load_frame(None).columns[0]
     'date'
+
+    Whatever the format, a column of dates arrives as dates: the text formats have no
+    way to record that one ever was, so they are parsed back on the way in. A column
+    that does not read as dates all the way down is left as the text it is.
 
     A path that is not there is reported before a reader is chosen, so the message
     names the file rather than complaining about its extension:
@@ -105,3 +116,41 @@ def _business_days(start: date, rows: int) -> pl.Series:
     """``rows`` weekdays from ``start``, so 252 periods really are about a year."""
     days = pl.date_range(start, start + timedelta(days=2 * rows), "1d", eager=True)
     return days.filter(days.dt.weekday() <= 5).head(rows).alias("date")
+
+
+def _with_dates(frame: pl.DataFrame) -> pl.DataFrame:
+    """``frame`` with every text column that reads cleanly as dates promoted to dates.
+
+    What :func:`pl.read_csv`'s ``try_parse_dates`` does during the parse, done after it
+    — the JSON readers take no such flag, and ``schema_overrides`` would need the column
+    named in advance, which is exactly what is not known here.
+    """
+    promoted = []
+    for name, dtype in frame.schema.items():
+        if dtype == pl.String:
+            parsed = _as_dates(frame[name])
+            if parsed is not None:
+                promoted.append(parsed.alias(name))
+    return frame.with_columns(promoted)
+
+
+def _as_dates(column: pl.Series) -> pl.Series | None:
+    """``column`` read as dates, or None where it is text that merely looks like some.
+
+    The bar is the whole column: a fund name, a code that happens to be eight digits,
+    or a date column with one bad row all stay as they arrived. Promoting on a partial
+    match would turn the rows that failed into nulls, and a null in the period column
+    is a row silently dropped from both the plot and the summary beside it.
+    """
+    try:
+        parsed = column.str.to_date(strict=False)
+    except pl.exceptions.ComputeError:
+        # Raised when no format fits *any* value — ordinary text. `strict=False` governs
+        # the values that fail once a format is chosen, not the choosing of it.
+        return None
+    # A value that did not parse comes back null, so an unchanged null count is the test
+    # for "every row was a date". The second clause is what stops a column of nothing
+    # becoming a column of no dates: polars hands an all-null column over as `Null`
+    # rather than `String` today, so nothing reaches here to need it, but a dateless
+    # date column would be a poor thing to acquire on the strength of that.
+    return parsed if parsed.null_count() == column.null_count() < parsed.len() else None
