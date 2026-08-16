@@ -45,25 +45,31 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Run `marimo run` (or `edit`) on the packaged notebook, and return its exit code."""
-    argv = list(sys.argv[1:] if argv is None else argv)
+def _split(argv: list[str]) -> tuple[list[str], list[str]]:
+    """Cut ``argv`` at the first bare ``--`` into our arguments and marimo's.
 
-    # Split on the first bare `--` before argparse sees any of it, rather than sweeping
-    # up the leftovers of parse_known_args: with an optional positional in the grammar,
-    # an unrecognised `--port 8080` loses its 8080 to `data`, and the mistake only
-    # surfaces as marimo complaining about a flag the user never typed.
-    if "--" in argv:
-        cut = argv.index("--")
-        argv, marimo_args = argv[:cut], argv[cut + 1 :]
-    else:
-        marimo_args = []
+    Done before argparse sees any of it, rather than sweeping up the leftovers of
+    parse_known_args: with an optional positional in the grammar, an unrecognised
+    `--port 8080` loses its 8080 to `data`, and the mistake only surfaces as marimo
+    complaining about a flag the user never typed.
 
-    parser = _parser()
-    args = parser.parse_args(argv)
+    >>> _split(["navs.parquet", "--", "--port", "8080"])
+    (['navs.parquet'], ['--port', '8080'])
+    >>> _split(["navs.parquet"])
+    (['navs.parquet'], [])
+    """
+    if "--" not in argv:
+        return argv, []
+    cut = argv.index("--")
+    return argv[:cut], argv[cut + 1 :]
 
-    # The notebook reads its options off mo.cli_args(), which is everything after the
-    # `--` in marimo's own command line — so ours and marimo's swap sides here.
+
+def _app_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> list[str]:
+    """The notebook's own options, as the command line it reads off ``mo.cli_args()``.
+
+    That is everything after the `--` in marimo's command line — so ours and marimo's
+    swap sides here.
+    """
     app_args: list[str] = []
     data = args.data_flag or args.data
     if data:
@@ -77,6 +83,16 @@ def main(argv: list[str] | None = None) -> int:
         app_args += ["--data", str(file)]
     if args.height:
         app_args += ["--height", str(args.height)]
+    return app_args
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run `marimo run` (or `edit`) on the packaged notebook, and return its exit code."""
+    ours, marimo_args = _split(list(sys.argv[1:] if argv is None else argv))
+
+    parser = _parser()
+    args = parser.parse_args(ours)
+    app_args = _app_args(args, parser)
 
     # `python -m marimo`, not a bare `marimo`: under uvx the two need not be the same
     # interpreter, and only this one is sure to have jointview importable — which the

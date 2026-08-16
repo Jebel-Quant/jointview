@@ -1,15 +1,15 @@
 """Which columns the app offers, and what it does to the pair you pick.
 
-These cover the frame-shaping half of :mod:`jointview.plot` — choosing the series,
-finding the x-axis, and cutting the two columns down to the rows they share. The
-drawing half is in :mod:`tests.test_plot`.
+These cover :mod:`jointview.columns` — choosing the series, finding the x-axis, and
+cutting the two columns down to the rows they share. What the drawing half then makes
+of that frame is in :mod:`tests.test_plot`.
 """
 
 import polars as pl
 import pytest
 
+from jointview.columns import aligned, date_column, default_pair, series_columns
 from jointview.data import demo_frame
-from jointview.plot import aligned, date_column, default_pair, series_columns
 
 
 def test_series_columns_are_the_numeric_ones():
