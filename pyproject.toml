@@ -1,0 +1,25 @@
+[build-system]
+requires = ["uv_build>=0.8.3,<0.12.0"]
+build-backend = "uv_build"
+
+[project]
+name = "jointview"
+version = "0.1.0"
+description = "A small marimo GUI for exploring the joint distribution of two Polars DataFrame columns."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "altair>=5.4",
+    "marimo>=0.13",
+    "numpy>=1.26",
+    "polars>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "vl-convert-python>=1.7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
