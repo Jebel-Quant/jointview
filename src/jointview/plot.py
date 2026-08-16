@@ -1,7 +1,9 @@
-"""The joint plot: a scatter of two columns with a marginal histogram per axis.
+"""Two price or NAV series drawn as two lines on one pair of axes.
 
-Brushing the scatter highlights the corresponding part of both marginals, which is
-the whole point of putting them on the same figure.
+The two columns are put on a shared y-axis rather than one axis each: two scales on
+one plot invent a relationship that is not in the data. Where the levels are far
+apart, ``rebase`` indexes both to the same starting value instead, which is the
+honest way to compare a series priced at 12 with one priced at 4,000.
 """
 
 from __future__ import annotations
@@ -9,147 +11,220 @@ from __future__ import annotations
 import altair as alt
 import polars as pl
 
-# One series, so one hue. Both of these clear 3:1 contrast against the light
-# (#fcfcfb) and the dark (#1a1a19) chart surface, so they survive marimo's theme
-# switch without being redefined.
-ACCENT = "#2a78d6"
+# Categorical slots 1 and 2 (blue, orange). The pair clears the contrast, chroma and
+# colour-vision separation floors against both the light (#fcfcfb) and the dark
+# (#1a1a19) chart surface, so it survives marimo's theme switch without being
+# redefined. CONTEXT is chrome — the crosshair — not a series.
+SERIES = ("#2a78d6", "#d95926")
 CONTEXT = "#8a8a84"
 
-MAX_BINS = 40
-MAX_POINTS = 20_000
-MARGINAL = 76
+BASE = 100.0
+MAX_POINTS = 4_000
+PERIOD = "period"
 
 
-def encoding_type(dtype: pl.DataType) -> str:
-    """Map a Polars dtype onto the Vega-Lite encoding type that fits it."""
-    if dtype.is_numeric():
-        return "quantitative"
-    if dtype.is_temporal():
-        return "temporal"
-    return "nominal"
+def series_columns(frame: pl.DataFrame) -> list[str]:
+    """The columns that can be drawn: every numeric one."""
+    return [name for name, dtype in frame.schema.items() if dtype.is_numeric()]
+
+
+def date_column(frame: pl.DataFrame) -> str | None:
+    """The first temporal column, which becomes the x-axis. None means row number."""
+    return next((name for name, dtype in frame.schema.items() if dtype.is_temporal()), None)
 
 
 def default_pair(frame: pl.DataFrame) -> tuple[int, int]:
-    """Column indices to open on — numeric first, so the app starts on a real scatter."""
-    if not frame.columns:
-        raise ValueError("frame has no columns")
-
-    numeric = [i for i, dtype in enumerate(frame.dtypes) if dtype.is_numeric()]
-    order = numeric + [i for i in range(frame.width) if i not in set(numeric)]
-    return order[0], order[1] if len(order) > 1 else order[0]
+    """Indices into :func:`series_columns` to open on — the first two series."""
+    names = series_columns(frame)
+    if not names:
+        raise ValueError("frame has no numeric columns to plot")
+    return 0, 1 if len(names) > 1 else 0
 
 
-def joint_frame(
-    frame: pl.DataFrame, x: str, y: str, *, max_points: int = MAX_POINTS
-) -> pl.DataFrame:
-    """The two columns actually drawn: renamed, complete cases only, sampled down.
+def aligned(frame: pl.DataFrame, a: str, b: str) -> pl.DataFrame:
+    """The two series on their common sample: ``period``, ``a``, ``b``, in order.
 
-    Renaming sidesteps Vega-Lite's field-shorthand escaping (dots, brackets) and lets
-    x and y point at the same source column without a duplicate-name error.
+    Both the picture and the summary tables are built from this, so the numbers
+    beside the chart always describe the lines in it. Renaming also sidesteps
+    Vega-Lite's field-shorthand escaping and lets ``a`` and ``b`` be the same column.
     """
-    for column in (x, y):
+    for column in (a, b):
         if column not in frame.columns:
             raise KeyError(f"no column {column!r} in frame")
+        if not frame.schema[column].is_numeric():
+            raise TypeError(f"column {column!r} is {frame.schema[column]}, which cannot be drawn")
 
-    data = frame.select(pl.col(x).alias("x"), pl.col(y).alias("y")).drop_nulls()
-    return data.sample(max_points, seed=0) if data.height > max_points else data
+    date = date_column(frame)
+    period = pl.col(date).alias(PERIOD) if date else pl.int_range(pl.len()).alias(PERIOD)
+    data = frame.select(period, pl.col(a).alias("a"), pl.col(b).alias("b"))
+    return data.drop_nulls().sort(PERIOD)
 
 
-def joint_chart(
+def line_frame(
     frame: pl.DataFrame,
-    x: str,
-    y: str,
+    a: str,
+    b: str,
     *,
-    width: int = 560,
-    height: int = 420,
-    max_bins: int = MAX_BINS,
+    rebase: bool = True,
+    base: float = BASE,
     max_points: int = MAX_POINTS,
-) -> alt.VConcatChart:
-    """Build the joint plot of column ``x`` against column ``y``."""
-    data = joint_frame(frame, x, y, max_points=max_points)
-    x_type = encoding_type(frame.schema[x])
-    y_type = encoding_type(frame.schema[y])
+) -> pl.DataFrame:
+    """What the chart draws: one ``period`` column and one column per named series.
 
-    brush = alt.selection_interval(name="brush", encodings=["x", "y"])
-    base = alt.Chart(data)
+    Wide rather than long, because the crosshair reads every series at the hovered
+    period out of a single row.
+    """
+    data = aligned(frame, a, b)
+    names = [a] if a == b else [a, b]
+    columns = [pl.col(source).alias(name) for source, name in zip("ab", names)]
+    if rebase:
+        columns = [column / column.first() * base for column in columns]
 
-    scatter = (
-        base.mark_circle(size=54, opacity=0.45, color=ACCENT)
+    return _thin(data.select(PERIOD, *columns), max_points)
+
+
+def line_chart(
+    frame: pl.DataFrame,
+    a: str,
+    b: str,
+    *,
+    rebase: bool = True,
+    base: float = BASE,
+    width: int | str = "container",
+    height: int | str = 700,
+    max_points: int = MAX_POINTS,
+) -> alt.LayerChart:
+    """Draw columns ``a`` and ``b`` of ``frame`` as two lines against time.
+
+    Width defaults to ``"container"``: the plot takes whatever the column around it
+    gives it, which is the point of a full-width app. Height stays a number, because
+    nothing in the page has a height for a chart to follow — 700 fills a laptop window
+    once the notebook margins are out of the way, without spilling off a short one.
+    """
+    wide = line_frame(frame, a, b, rebase=rebase, base=base, max_points=max_points)
+    names = [name for name in wide.columns if name != PERIOD]
+
+    date = date_column(frame)
+    x_type = "temporal" if date else "quantitative"
+    x_title = date or "row"
+    y_title = f"indexed to {base:g}" if rebase else "level"
+
+    long = wide.unpivot(index=PERIOD, variable_name="series", value_name="value")
+    x = alt.X(PERIOD, type=x_type, title=x_title)
+
+    colour = alt.Color(
+        "series",
+        type="nominal",
+        title=None,
+        # Bound to the names, so picking a different pair never repaints a series that
+        # stayed on screen.
+        scale=alt.Scale(domain=names, range=list(SERIES[: len(names)])),
+        legend=alt.Legend(orient="top", offset=4, symbolType="stroke", symbolStrokeWidth=2),
+    )
+
+    lines = (
+        alt.Chart(long)
+        .mark_line(strokeWidth=2, clip=True)
         .encode(
-            alt.X("x", type=x_type, title=x, scale=_scale(x_type)),
-            alt.Y("y", type=y_type, title=y, scale=_scale(y_type)),
+            x,
+            # The levels frame the data; a zero baseline on a NAV is wasted panel.
+            alt.Y("value", type="quantitative", title=y_title, scale=alt.Scale(zero=False)),
+            colour,
+        )
+    )
+
+    # The crosshair finds the period; the tooltip then reads every series at it. Nobody
+    # can be asked to hover a 2px line.
+    hover = alt.selection_point(
+        name="hover",
+        fields=[PERIOD],
+        nearest=True,
+        on="pointerover",
+        clear="pointerout",
+        empty=False,
+    )
+    rule = (
+        alt.Chart(wide)
+        .mark_rule(color=CONTEXT, strokeWidth=1)
+        .encode(
+            x,
+            opacity=alt.condition(hover, alt.value(0.6), alt.value(0.0)),
             tooltip=[
-                alt.Tooltip("x", type=x_type, title=x),
-                alt.Tooltip("y", type=y_type, title=y),
+                alt.Tooltip(PERIOD, type=x_type, title=x_title),
+                *(alt.Tooltip(name, type="quantitative", format=",.2f") for name in names),
             ],
         )
-        .add_params(brush)
-        .properties(width=width, height=height)
+        .add_params(hover)
     )
-
-    top = _marginal(base, "x", x_type, max_bins, brush, horizontal=True).properties(
-        width=width, height=MARGINAL
-    )
-    right = _marginal(base, "y", y_type, max_bins, brush, horizontal=False).properties(
-        width=MARGINAL, height=height
+    markers = lines.mark_point(size=64, filled=True).encode(
+        opacity=alt.condition(hover, alt.value(1.0), alt.value(0.0))
     )
 
     return (
-        alt.vconcat(top, alt.hconcat(scatter, right, spacing=6), spacing=6)
-        .configure_axis(grid=True, gridOpacity=0.3, domain=False, labelPadding=4)
+        alt.layer(rule, lines, markers, _end_labels(wide, names, x))
+        .resolve_scale(color="shared")
+        .configure_axis(grid=True, gridOpacity=0.3, domain=False, labelPadding=4, tickSize=4)
         .configure_view(stroke=None)
-        .configure_concat(spacing=6)
+        .configure_legend(labelFontSize=12)
+        .properties(
+            # One plotting area for all four layers, sized at the top level so a
+            # container width is measured once rather than per layer.
+            width=width,
+            height=height,
+            # Only the right margin earns its keep: it is where the end labels go.
+            padding={"left": 0, "top": 0, "bottom": 0, "right": 76},
+            # "pad", the default, grows the figure past the box it was given and puts
+            # the gutter back; fitting spends the padding out of the size instead.
+            autosize=_autosize(width, height),
+        )
     )
 
 
-def _scale(kind: str) -> alt.Scale | alt.UndefinedType:
-    """Quantitative axes should frame the data, not be dragged down to zero."""
-    return alt.Scale(zero=False) if kind == "quantitative" else alt.Undefined
+def _autosize(width: int | str, height: int | str) -> alt.AutoSizeParams:
+    """Fit whichever axes were asked to follow their container, and leave the rest.
 
-
-def _marginal(
-    base: alt.Chart,
-    field: str,
-    kind: str,
-    max_bins: int,
-    brush: alt.Parameter,
-    *,
-    horizontal: bool,
-) -> alt.LayerChart:
-    """A histogram of one field, layered as context (grey) plus selection (accent).
-
-    ``horizontal`` means the bars grow upwards along a horizontal field axis — the
-    top marginal. The right marginal is the same thing rotated.
+    A figure given two numbers keeps Vega-Lite's own ``pad``: it was asked for a
+    drawing of exactly that size, and fitting would quietly shrink it.
     """
-    nominal = kind == "nominal"
-    binning = alt.Undefined if nominal else alt.Bin(maxbins=max_bins)
+    follows = ((width == "container", "x"), (height == "container", "y"))
+    axes = "".join(axis for container, axis in follows if container)
+    kind = {"": "pad", "xy": "fit"}.get(axes, f"fit-{axes}")
+    return alt.AutoSizeParams(type=kind, contains="padding")
 
-    # Bars are anchored to the count baseline, so only the far end gets rounded.
-    corners = (
-        {"cornerRadiusTopLeft": 3, "cornerRadiusTopRight": 3}
-        if horizontal
-        else {"cornerRadiusTopRight": 3, "cornerRadiusBottomRight": 3}
-    )
-    # A handful of categories would otherwise each get a bar the width of its band,
-    # which reads as a block of colour rather than as a distribution.
-    style = {"binSpacing": 2, "size": 20, **corners} if nominal else {"binSpacing": 2, **corners}
-    mark = base.mark_bar(**style)
 
-    field_channel = alt.X if horizontal else alt.Y
-    count_channel = alt.Y if horizontal else alt.X
+def _end_labels(wide: pl.DataFrame, names: list[str], x: alt.X) -> alt.LayerChart:
+    """The series name at the end of its own line, so identity is never colour alone.
 
-    layer = mark.encode(
-        field_channel(field, type=kind, bin=binning, title=None, axis=None, scale=_scale(kind)),
-        # The marginals are context for the scatter; their own axis would only add
-        # ink, so the count is carried by the tooltip instead.
-        count_channel("count()", title=None, axis=None, stack=None),
-        tooltip=[
-            alt.Tooltip(field, type=kind, bin=binning, title="bin"),
-            alt.Tooltip("count()", title="rows"),
-        ],
-    )
+    The labels wear chrome ink rather than the series colour — the line they sit on
+    carries the identity — and the upper one is nudged up, the lower one down, so a
+    pair that ends at the same level does not print on top of itself.
+    """
+    last = wide.tail(1)
+    order = sorted(names, key=lambda name: -float(last[name][0]))
+    dodge = dict(zip(order, (-8, 8))) if len(order) > 1 else {order[0]: 0}
 
     return alt.layer(
-        layer.mark_bar(color=CONTEXT, **style),
-        layer.mark_bar(color=ACCENT, **style).transform_filter(brush),
+        *(
+            alt.Chart(last.select(PERIOD, pl.col(name).alias("value")))
+            .mark_text(
+                align="left", dx=8, dy=dodge[name], fontSize=11, fontWeight=600, color=CONTEXT
+            )
+            .encode(x, alt.Y("value", type="quantitative"), text=alt.value(name))
+            for name in names
+        )
     )
+
+
+def _thin(frame: pl.DataFrame, max_points: int) -> pl.DataFrame:
+    """Every k-th row of an over-long curve, with the last one kept.
+
+    A line is a shape, not a scatter: dropping intermediate points leaves the shape
+    intact, and it is the browser rather than the reader that notices the difference.
+    """
+    if frame.height <= max_points or max_points < 2:
+        return frame
+
+    # Counting gaps rather than rows: keeping the last point costs one of the budget.
+    stride = -(-(frame.height - 1) // (max_points - 1))
+    index = pl.int_range(pl.len())
+    return frame.filter((index % stride == 0) | (index == frame.height - 1))

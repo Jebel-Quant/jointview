@@ -1,0 +1,109 @@
+import sys
+
+import pytest
+
+from jointview import cli
+
+
+@pytest.fixture
+def command(monkeypatch):
+    """Run main() without starting a server, and hand back the argv it would have used."""
+    seen = []
+
+    def fake_call(argv):
+        seen.append(argv)
+        return 0
+
+    monkeypatch.setattr(cli.subprocess, "call", fake_call)
+
+    def run(*args):
+        assert cli.main(list(args)) == 0
+        return seen[-1]
+
+    return run
+
+
+@pytest.fixture
+def navs(tmp_path):
+    from jointview.data import demo_frame
+
+    file = tmp_path / "navs.parquet"
+    demo_frame(rows=20).write_parquet(file)
+    return file
+
+
+def test_the_notebook_is_packaged_next_to_the_cli():
+    assert cli.APP.exists()
+
+
+def test_it_runs_the_packaged_notebook_on_this_interpreter(command):
+    assert command() == [sys.executable, "-m", "marimo", "run", str(cli.APP)]
+
+
+def test_no_data_means_no_arguments_for_the_notebook(command):
+    # Nothing after the `--`, so the notebook falls back to the demo frame.
+    assert "--" not in command()
+
+
+def test_edit_opens_the_notebook_instead(command):
+    assert "edit" in command("--edit")
+    assert "run" not in command("--edit")
+
+
+def test_data_reaches_the_notebook_behind_the_separator(command, navs):
+    argv = command(str(navs))
+    assert argv[-3:] == ["--", "--data", str(navs)]
+
+
+def test_a_relative_path_is_resolved_against_the_shell(command, navs, monkeypatch):
+    # The notebook lives in the installed wheel, not where the user is standing.
+    monkeypatch.chdir(navs.parent)
+    assert command(navs.name)[-1] == str(navs)
+
+
+def test_the_old_data_flag_still_works(command, navs):
+    assert command("--data", str(navs))[-1] == str(navs)
+
+
+def test_height_is_passed_on(command):
+    assert command("--height", "900")[-2:] == ["--height", "900"]
+
+
+def test_marimo_arguments_go_in_front_of_the_notebook(command):
+    argv = command("--", "--port", "8080", "--headless")
+    assert argv[-4:] == ["--port", "8080", "--headless", str(cli.APP)]
+
+
+def test_a_marimo_flags_value_is_not_mistaken_for_the_data_file(command):
+    # `--port 8080` used to lose its 8080 to the optional positional, and the notebook
+    # was then asked to read a file called 8080.
+    assert "--data" not in command("--", "--port", "8080")
+
+
+def test_an_unknown_flag_on_our_side_is_an_error(command):
+    with pytest.raises(SystemExit) as error:
+        cli.main(["--nonsense"])
+    assert error.value.code == 2
+
+
+def test_a_missing_file_fails_before_anything_is_started(monkeypatch, tmp_path):
+    def fail(argv):  # pragma: no cover - the point is that it is never reached
+        raise AssertionError("marimo should not have been started")
+
+    monkeypatch.setattr(cli.subprocess, "call", fail)
+    with pytest.raises(SystemExit) as error:
+        cli.main([str(tmp_path / "absent.parquet")])
+    assert error.value.code == 2
+
+
+def test_the_exit_code_is_marimos(monkeypatch):
+    monkeypatch.setattr(cli.subprocess, "call", lambda argv: 3)
+    assert cli.main([]) == 3
+
+
+def test_ctrl_c_is_not_a_traceback(monkeypatch):
+    def interrupt(argv):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli.subprocess, "call", interrupt)
+    assert cli.main([]) == 130

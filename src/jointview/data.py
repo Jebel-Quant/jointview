@@ -24,6 +24,17 @@ READERS: dict[str, Callable[[Path], pl.DataFrame]] = {
     ".tsv": lambda p: pl.read_csv(p, separator="\t"),
 }
 
+# name: starting level, sensitivity to the common market move, daily drift of its
+# own, and the size of the wobble nobody else shares.
+FUNDS: dict[str, tuple[float, float, float, float]] = {
+    "world_equity": (100.0, 1.00, 0.00000, 0.0030),
+    "tech_fund": (48.5, 1.35, 0.00030, 0.0090),
+    "value_fund": (212.0, 0.85, 0.00005, 0.0060),
+    "balanced": (1_450.0, 0.45, 0.00010, 0.0030),
+    "bond_fund": (98.0, 0.10, 0.00004, 0.0020),
+    "cash": (1.0, 0.00, 0.00008, 0.00002),
+}
+
 
 def load_frame(path: str | Path | None) -> pl.DataFrame:
     """Read a DataFrame from ``path``, or build the demo frame when it is None."""
@@ -42,30 +53,24 @@ def load_frame(path: str | Path | None) -> pl.DataFrame:
     return reader(file)
 
 
-def demo_frame(rows: int = 2_000, seed: int = 42) -> pl.DataFrame:
-    """A frame with a mix of dtypes and a few deliberately correlated pairs."""
+def demo_frame(rows: int = 1_500, seed: int = 42) -> pl.DataFrame:
+    """Daily NAVs for a handful of made-up funds, on deliberately different scales.
+
+    They share a market factor, so the lines rhyme without being copies, and they
+    start anywhere from 1 to 1,450 — which is exactly the case that needs indexing
+    before two of them can be read on one axis.
+    """
     rng = np.random.default_rng(seed)
-    start = date(2020, 1, 1)
+    market = rng.normal(0.0004, 0.011, rows)
 
-    # A latent factor drives returns, so return/factor is tight and the rest is not.
-    factor = rng.normal(0.0, 1.0, rows)
-    beta = rng.normal(1.0, 0.35, rows)
-    idiosyncratic = rng.normal(0.0, 1.0, rows)
+    navs = {
+        name: start * np.cumprod(1.0 + drift + beta * market + rng.normal(0.0, wobble, rows))
+        for name, (start, beta, drift, wobble) in FUNDS.items()
+    }
+    return pl.DataFrame({"date": _business_days(date(2020, 1, 1), rows), **navs})
 
-    returns = 0.011 * (beta * factor + idiosyncratic)
-    volatility = 0.09 + 0.04 * rng.chisquare(3, rows) / 3.0
 
-    return pl.DataFrame(
-        {
-            "date": pl.date_range(start, start + timedelta(days=rows - 1), "1d", eager=True),
-            "sector": rng.choice(["energy", "financials", "health", "tech"], rows),
-            "factor": factor,
-            "beta": beta,
-            "returns": returns,
-            "volatility": volatility,
-            # Heavy right tail: log-normal, so the marginal is worth looking at.
-            "volume": np.exp(rng.normal(12.0, 0.9, rows)),
-            "spread_bps": 4.0 + 60.0 * volatility + rng.exponential(2.0, rows),
-            "noise": rng.normal(0.0, 1.0, rows),
-        }
-    )
+def _business_days(start: date, rows: int) -> pl.Series:
+    """``rows`` weekdays from ``start``, so 252 periods really are about a year."""
+    days = pl.date_range(start, start + timedelta(days=2 * rows), "1d", eager=True)
+    return days.filter(days.dt.weekday() <= 5).head(rows).alias("date")
