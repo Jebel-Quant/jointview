@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
+import subprocess  # nosec B404 - launching marimo is what this module is for
 import sys
 from pathlib import Path
 
@@ -11,6 +11,7 @@ APP = Path(__file__).with_name("app.py")
 
 
 def _parser() -> argparse.ArgumentParser:
+    """The app's own arguments — everything marimo's command line does not own."""
     parser = argparse.ArgumentParser(
         prog="jointview",
         description="Compare two price or NAV series of a table, side by side.",
@@ -94,11 +95,11 @@ def main(argv: list[str] | None = None) -> int:
         command += ["--", *app_args]
 
     try:
-        return subprocess.call(command)
+        # No shell, and argv is a list, so nothing here is word-split or glob-expanded:
+        # the executable is this interpreter, the notebook path is the installed
+        # wheel's, and the rest are the user's own arguments on their own machine —
+        # the same ones they would have typed after `marimo run`.
+        return subprocess.call(command)  # noqa: S603 # nosec B603
     except KeyboardInterrupt:
         # Ctrl-C reached the child too; it has already said its goodbyes.
         return 130
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

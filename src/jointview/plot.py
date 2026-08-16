@@ -8,6 +8,8 @@ honest way to compare a series priced at 12 with one priced at 4,000.
 
 from __future__ import annotations
 
+from typing import Literal, cast
+
 import altair as alt
 import polars as pl
 
@@ -37,7 +39,7 @@ def default_pair(frame: pl.DataFrame) -> tuple[int, int]:
     """Indices into :func:`series_columns` to open on — the first two series."""
     names = series_columns(frame)
     if not names:
-        raise ValueError("frame has no numeric columns to plot")
+        raise ValueError("frame has no numeric columns to plot")  # noqa: TRY003
     return 0, 1 if len(names) > 1 else 0
 
 
@@ -50,9 +52,9 @@ def aligned(frame: pl.DataFrame, a: str, b: str) -> pl.DataFrame:
     """
     for column in (a, b):
         if column not in frame.columns:
-            raise KeyError(f"no column {column!r} in frame")
+            raise KeyError(f"no column {column!r} in frame")  # noqa: TRY003
         if not frame.schema[column].is_numeric():
-            raise TypeError(f"column {column!r} is {frame.schema[column]}, which cannot be drawn")
+            raise TypeError(f"column {column!r} is {frame.schema[column]}, which cannot be drawn")  # noqa: TRY003
 
     date = date_column(frame)
     period = pl.col(date).alias(PERIOD) if date else pl.int_range(pl.len()).alias(PERIOD)
@@ -76,7 +78,7 @@ def line_frame(
     """
     data = aligned(frame, a, b)
     names = [a] if a == b else [a, b]
-    columns = [pl.col(source).alias(name) for source, name in zip("ab", names)]
+    columns = [pl.col(source).alias(name) for source, name in zip("ab", names, strict=False)]
     if rebase:
         columns = [column / column.first() * base for column in columns]
 
@@ -122,8 +124,12 @@ def line_chart(
         legend=alt.Legend(orient="top", offset=4, symbolType="stroke", symbolStrokeWidth=2),
     )
 
+    # The `ty: ignore` here and below is altair's `mark_*` returning an unresolved
+    # TypeVar rather than a chart, so the checker cannot see `.encode` on it. It is a
+    # limitation of the stubs, not of the call — the same chain is what altair's own
+    # documentation shows.
     lines = (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=2, clip=True)
         .encode(
             x,
@@ -144,7 +150,7 @@ def line_chart(
         empty=False,
     )
     rule = (
-        alt.Chart(wide)
+        alt.Chart(wide)  # ty: ignore[unresolved-attribute]
         .mark_rule(color=CONTEXT, strokeWidth=1)
         .encode(
             x,
@@ -188,7 +194,12 @@ def _autosize(width: int | str, height: int | str) -> alt.AutoSizeParams:
     """
     follows = ((width == "container", "x"), (height == "container", "y"))
     axes = "".join(axis for container, axis in follows if container)
-    kind = {"": "pad", "xy": "fit"}.get(axes, f"fit-{axes}")
+    # Built from the axes rather than spelled out, so the cast is what tells the type
+    # checker that the four strings this can produce are exactly Vega-Lite's four.
+    kind = cast(
+        "Literal['pad', 'fit', 'fit-x', 'fit-y']",
+        {"": "pad", "xy": "fit"}.get(axes, f"fit-{axes}"),
+    )
     return alt.AutoSizeParams(type=kind, contains="padding")
 
 
@@ -201,17 +212,20 @@ def _end_labels(wide: pl.DataFrame, names: list[str], x: alt.X) -> alt.LayerChar
     """
     last = wide.tail(1)
     order = sorted(names, key=lambda name: -float(last[name][0]))
-    dodge = dict(zip(order, (-8, 8))) if len(order) > 1 else {order[0]: 0}
+    dodge = dict(zip(order, (-8, 8), strict=False)) if len(order) > 1 else {order[0]: 0}
 
-    return alt.layer(
-        *(
-            alt.Chart(last.select(PERIOD, pl.col(name).alias("value")))
-            .mark_text(
-                align="left", dx=8, dy=dodge[name], fontSize=11, fontWeight=600, color=CONTEXT
+    # alt.layer widens to LayerChart | FacetChart for the general case; none of these
+    # labels is faceted, so the layer it returns is always the former.
+    return cast(
+        "alt.LayerChart",
+        alt.layer(
+            *(
+                alt.Chart(last.select(PERIOD, pl.col(name).alias("value")))  # ty: ignore[unresolved-attribute]
+                .mark_text(align="left", dx=8, dy=dodge[name], fontSize=11, fontWeight=600, color=CONTEXT)
+                .encode(x, alt.Y("value", type="quantitative"), text=alt.value(name))
+                for name in names
             )
-            .encode(x, alt.Y("value", type="quantitative"), text=alt.value(name))
-            for name in names
-        )
+        ),
     )
 
 

@@ -6,9 +6,9 @@ a generated frame so that ``marimo run app.py`` works out of the box.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import polars as pl
@@ -43,12 +43,12 @@ def load_frame(path: str | Path | None) -> pl.DataFrame:
 
     file = Path(path).expanduser()
     if not file.exists():
-        raise FileNotFoundError(f"no such file: {file}")
+        raise FileNotFoundError(f"no such file: {file}")  # noqa: TRY003
 
     reader = READERS.get(file.suffix.lower())
     if reader is None:
         supported = ", ".join(sorted(READERS))
-        raise ValueError(f"cannot read {file.suffix or file.name!r}; supported: {supported}")
+        raise ValueError(f"cannot read {file.suffix or file.name!r}; supported: {supported}")  # noqa: TRY003
 
     return reader(file)
 
