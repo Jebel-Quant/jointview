@@ -71,6 +71,13 @@ def _app_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> list
     swap sides here.
     """
     app_args: list[str] = []
+    # Both spellings at once is a confusion rather than a preference. The alias is
+    # hidden, so whoever typed it alongside the positional cannot know which of the two
+    # files is about to open — and silently picking one would open the wrong data under
+    # a page that gives no sign of it. Reported here for the same reason a missing file
+    # is: before the browser tab, not after.
+    if args.data_flag and args.data:
+        parser.error(f"give the file once: {args.data} as the argument, {args.data_flag} after --data")
     data = args.data_flag or args.data
     if data:
         # Absolute, because the path was typed relative to the shell and the notebook
