@@ -12,6 +12,21 @@ and ``--height``.
 # anyway. Told to ruff here rather than in a config file, so the reason sits next to
 # the code it excuses. (ty asks for none of this; it does not require annotations.)
 # ruff: noqa: ANN001, ANN202
+#
+# The `return` closing each cell is marimo's too, and it is why four of them below carry
+# a `# pragma: no cover`. Running the notebook never calls these functions: marimo keeps
+# each cell as its body alone — the stored source parses to Import, Expr, Assign or
+# FunctionDef, never Return — and executes that as two code objects, the body exec'd and
+# a final expression eval'd to become the cell's output. So no `return` here is ever
+# reached, by `app.run()` or by anything else.
+#
+# Which makes the interesting case the five that carry no pragma. They are not better
+# tested; they are shadowed. Where a cell ends in a statement rather than an expression,
+# marimo emits its synthetic end-of-cell expression onto the next line down, and for a
+# one-line last statement that line is the `return`. Coverage sees bytecode there and
+# marks it hit. Nothing to fix — but the four pragmas are the honest cells, not the
+# neglected ones, and removing them would report a reach that `tests/test_app.py` does
+# not have.
 
 import marimo
 
