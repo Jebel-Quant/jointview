@@ -101,6 +101,15 @@ def demo_frame(rows: int = 1_500, seed: int = 42) -> pl.DataFrame:
     They share a market factor, so the lines rhyme without being copies, and they
     start anywhere from 1 to 1,450 — which is exactly the case that needs indexing
     before two of them can be read on one axis.
+
+    The dates come first, so the frame is ready for :func:`jointview.plot.line_chart`
+    as it stands, and ``seed`` makes it the same frame every time:
+
+    >>> frame = demo_frame(rows=10)
+    >>> frame.columns[:2]
+    ['date', 'world_equity']
+    >>> frame.height
+    10
     """
     rng = np.random.default_rng(seed)
     market = rng.normal(0.0004, 0.011, rows)
