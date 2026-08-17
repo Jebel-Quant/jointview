@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and entries are generated from [Conventional Commits](https://www.conventionalcommits.org).
 
+## [0.3.2] - 2026-08-17
+
+### Bug Fixes
+- Name a directory as one in load_frame (#36)
+- Recover dates from the text formats (#37)
+- Draw the levels when a series cannot be indexed (#41)
+- The three findings from the quality run (#42, #43, #44) (#45)
+- Publish the PERIOD contract, and say why four cell returns are excluded (#46, #47) (#48)
+
+### Documentation
+- Give aligned, load_frame and line_frame runnable examples (#32) (#34)
+- Check the README example's output, not just its exit code (#39)
+
+### Maintenance
+- Record the docs/development exclusion (#31) (#33)
+
 ## [0.3.1] - 2026-08-16
 
 ### Documentation
