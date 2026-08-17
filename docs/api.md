@@ -15,7 +15,9 @@ Note what `summary_markdown` takes: the frame **and** the column name, not a bar
 series, plus the column carrying the period. jQuantStats reads the annualisation factor
 off the spacing of the observations, so the dates have to travel with the levels.
 `date_col` defaults to `"period"` — the column [`aligned`](#columns) writes — so a frame
-that has not been through `aligned` needs to name its own, as here.
+that has not been through `aligned` needs to name its own, as here. That name is
+exported as `jointview.PERIOD`, so code reading an aligned frame back does not have to
+spell the literal.
 
 The five modules below are the whole of it. `jointview.app` is the notebook itself and
 has no API — run it with `jointview` rather than importing it.
