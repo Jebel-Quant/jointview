@@ -90,6 +90,18 @@ def line_chart(
 ) -> alt.LayerChart:
     """Draw columns ``a`` and ``b`` of ``frame`` as two lines against time.
 
+    Four layers over one plotting area — the crosshair, the lines, the hover markers
+    and the end labels — handed back as a plain Altair chart, so nothing here needs
+    marimo to draw it:
+
+    >>> import polars as pl
+    >>> frame = pl.DataFrame({"cash": [1.0, 1.01, 1.02], "balanced": [1450.0, 1479.0, 1465.0]})
+    >>> chart = line_chart(frame, "cash", "balanced")
+    >>> type(chart).__name__
+    'LayerChart'
+    >>> len(chart.to_dict()["layer"])
+    4
+
     Width defaults to ``"container"``: the plot takes whatever the column around it
     gives it, which is the point of a full-width app. Height stays a number, because
     nothing in the page has a height for a chart to follow — 700 fills a laptop window
@@ -97,6 +109,14 @@ def line_chart(
 
     Asking to rebase a pair that cannot be indexed draws the raw levels, and the
     y-axis says ``level`` rather than claiming otherwise — see :func:`_rebasable`.
+    The title is read back out of the compiled spec, because that is the only place it
+    exists; layer 1 is :func:`_lines`, the series themselves:
+
+    >>> chart.to_dict()["layer"][1]["encoding"]["y"]["title"]
+    'indexed to 100'
+    >>> pnl = pl.DataFrame({"strategy": [0.0, 5.0, 3.0], "benchmark": [0.0, 2.0, 4.0]})
+    >>> line_chart(pnl, "strategy", "benchmark").to_dict()["layer"][1]["encoding"]["y"]["title"]
+    'level'
     """
     wide, rebased = _wide(frame, a, b, rebase=rebase, base=base, max_points=max_points)
     names = [name for name in wide.columns if name != PERIOD]

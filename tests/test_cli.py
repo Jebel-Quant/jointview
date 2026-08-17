@@ -81,6 +81,20 @@ def test_the_old_data_flag_still_works(command, navs):
     assert command("--data", str(navs))[-1] == str(navs)
 
 
+def test_both_spellings_of_the_data_file_is_an_error(capsys, navs):
+    """An alias that quietly beat the positional would open the wrong file, silently.
+
+    The flag is hidden, so nobody types both on purpose: they are unsure which spelling
+    this version reads. Naming both paths answers that; picking one would not.
+    """
+    with pytest.raises(SystemExit) as error:
+        cli.main([str(navs), "--data", "other.parquet"])
+    assert error.value.code == 2
+    message = capsys.readouterr().err
+    assert str(navs) in message
+    assert "other.parquet" in message
+
+
 def test_height_is_passed_on(command):
     """The plot height is the one thing the page cannot work out for itself."""
     assert command("--height", "900")[-2:] == ["--height", "900"]
