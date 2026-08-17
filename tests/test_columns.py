@@ -8,8 +8,19 @@ of that frame is in :mod:`tests.test_plot`.
 import polars as pl
 import pytest
 
-from jointview.columns import aligned, date_column, default_pair, series_columns
+import jointview
+from jointview.columns import PERIOD, aligned, date_column, default_pair, series_columns
 from jointview.data import demo_frame
+
+
+def test_the_period_contract_is_on_the_public_surface():
+    """`aligned` is exported, so the name of the column it writes has to be too.
+
+    Without it the only way to read that frame back is to spell "period" at the call
+    site — the one literal this module exists to keep in a single place.
+    """
+    assert jointview.PERIOD is PERIOD
+    assert "PERIOD" in jointview.__all__
 
 
 def test_series_columns_are_the_numeric_ones():
