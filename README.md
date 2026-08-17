@@ -4,7 +4,7 @@ Compare two price or NAV series of a [Polars](https://pola.rs) DataFrame, side b
 
 [![PyPI version](https://img.shields.io/pypi/v/jointview.svg?logo=pypi&logoColor=white)](https://pypi.org/project/jointview/)
 
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-green.svg)](https://github.com/Jebel-Quant/jointview/blob/main/LICENSE)
 [![Python versions](https://img.shields.io/badge/Python-3.11%20•%203.12%20•%203.13%20•%203.14-blue?logo=python)](https://www.python.org/)
 [![CI](https://github.com/Jebel-Quant/jointview/actions/workflows/rhiza_ci.yml/badge.svg?event=push)](https://github.com/Jebel-Quant/jointview/actions/workflows/rhiza_ci.yml)
 [![Coverage](https://jebel-quant.github.io/jointview/coverage-badge.svg)](https://jebel-quant.github.io/jointview/reports/html-coverage/)
