@@ -72,8 +72,10 @@ pinned to a tag, instead of from a synced `.rhiza/tests/` folder — the same se
 installed rather than copied. `.rhiza/tests` is excluded in `.rhiza/template.yml` because
 of it, and the two are load-bearing together: without the override `rhiza-test` finds no
 directory, prints a warning and **exits 0**, so `make all` would go green measuring
-nothing. Committed rather than left in a gitignored `local.mk` for exactly that reason —
-CI needs the replacement too. Both revert once the template ships the plugin wiring.
+nothing, and `make test-pyproject` — which has no such guard — would break outright.
+Committed rather than left in a gitignored `local.mk` for that reason, so a fresh clone
+gets both halves; CI runs neither target either way (see Releasing, below). Both revert
+once the template ships the plugin wiring.
 
 ## What this repo owns, and what it does not
 

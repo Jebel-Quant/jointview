@@ -14,9 +14,13 @@ include .rhiza/rhiza.mk
 # Both recipes below shadow template-owned ones, which is why they live here rather than
 # in the fragments that define them: `.rhiza/make.d/` must not be edited locally. Make
 # announces each shadowing at parse time ("overriding commands for target"); those lines
-# are the mechanism working, not a fault. Committed rather than left in `local.mk` so CI
-# runs the checks too — gitignored, `rhiza-test` would find no directory, warn, and exit 0.
-# The rationale for the whole arrangement is in CLAUDE.md and `.rhiza/template.yml`.
+# are the mechanism working, not a fault.
+#
+# Committed rather than left in a gitignored `local.mk` because the exclusion in
+# `.rhiza/template.yml` is committed: without these, a fresh clone has `make test-pyproject`
+# outright broken and `make rhiza-test` silently passing over nothing. Not a CI argument —
+# the reusable workflow at v1.3.3 runs neither target. The rationale for the whole
+# arrangement is in CLAUDE.md and `.rhiza/template.yml`.
 
 # Pinned to a tag rather than a branch: a gate that moves under you is not a gate.
 PYTEST_RHIZA = pytest-rhiza @ git+https://github.com/Jebel-Quant/pytest-rhiza@v0.2.0
