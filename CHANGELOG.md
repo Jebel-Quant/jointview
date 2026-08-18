@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and entries are generated from [Conventional Commits](https://www.conventionalcommits.org).
 
+## [0.3.3] - 2026-08-18
+
+### Bug Fixes
+- Repair the two broken badge links in the README (#51)
+
+### Maintenance
+- Run the rhiza checks from pytest-rhiza, not .rhiza/tests (#58)
+- Replace the synced make layer with rhiza-task from PyPI (#60)
+- Delete .rhiza/rhiza.mk and trim the release workflow (#61)
+- Exclude rhiza_release.yml from the sync (#62)
+
+### Other Changes
+- Delete .rhiza/completions directory (#52)
+- Delete .github/pull_request_template.md
+- Delete .github/workflows/rhiza_mutation.yml (#55)
+- Delete .github/DISCUSSION_TEMPLATE directory (#56)
+- Delete .github/ISSUE_TEMPLATE directory (#57)
+- Delete .rhiza/assets directory (#53)
+- Delete .rhiza/make.d/completions.mk (#54)
+- Delete .github/workflows/rhiza_fuzzing.yml
+
 ## [0.3.2] - 2026-08-17
 
 ### Bug Fixes
