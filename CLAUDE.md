@@ -81,11 +81,22 @@ nothing left to shadow.
 --flag` is how you reach a flag the catch-all cannot pass, `--strict` above all: it turns a
 gate that found nothing to measure from a yellow line into a red one.
 
-What the repo still says for itself now has a home that is not a make variable:
-`[tool.rhiza-task]` in `pyproject.toml` pins pytest-rhiza to an exact PyPI version rather
-than the package's default git tag, and adds `mkdocstrings[python]` to the book build.
-`.rhiza/.env` keeps `SOURCE_FOLDER`, `TYPECHECKER` and the CI OS matrix, unchanged and read
-by both the CLI and the workflows.
+Everything the repo still says for itself is said in one place: `[tool.rhiza-task]` in
+`pyproject.toml`. It pins pytest-rhiza to an exact PyPI version rather than the package's
+default git tag, adds `mkdocstrings[python]` to the book build, and holds the three-OS CI
+matrix.
+
+**`.rhiza/.env` is gone too, and this is where its last setting went.** The file carried
+four variables and three of them — `SOURCE_FOLDER=src`, `MARIMO_FOLDER=docs/notebooks`,
+`TYPECHECKER=ty` — had become verbatim restatements of `rhiza_task.config.Config`'s
+dataclass defaults, `ty` included: the reason for choosing it (`both` masks ty's exit code
+behind mypy's, and mypy `--strict` spends its findings on polars' and altair's own
+union-typed signatures) is now upstream's default rather than this repo's override. Only
+`RHIZA_CI_OS_MATRIX` said something the defaults do not, since the default is
+`["ubuntu-latest"]` alone, so it moved to `ci-os-matrix` in `[tool.rhiza-task]` — a layer
+*above* `.env` in the five-layer resolution order, so nothing about precedence changed.
+`.rhiza/.gitignore` went with it: its single line was `!.env`, un-ignoring the file against
+the root `.gitignore`, and with no `.env` there is nothing to un-ignore.
 
 ## What this repo owns, and what it does not
 
@@ -116,14 +127,18 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. Five entries stand: `docs/development/`,
+a directory entry covering everything beneath it. Eight entries stand: `docs/development/`,
 where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
 dropped in favour of the `pytest-rhiza` plugin; `.rhiza/make.d/` with `.rhiza/rhiza.mk`,
-dropped in favour of `rhiza-task`; and `.github/workflows/rhiza_release.yml`, which is
-kept rather than dropped — the exclusion protects a local edit to a synced file instead of
-refusing the file. In each case the exclusion, not the deletion, is what makes the refusal
-stick — which is why the two make entries stay after the files themselves are gone from
-the tree.
+dropped in favour of `rhiza-task`; `.rhiza/.env` with `.rhiza/.gitignore`, dropped once
+`[tool.rhiza-task]` held the only setting either of them still carried; `.github/CONFIG.md`,
+a walkthrough for configuring `PAT_TOKEN` and the release secrets in the GitHub UI, which
+belongs to whoever set the repo up rather than to anyone reading the tree — and whose
+central subject, a stored PyPI credential, does not apply to a repo publishing by Trusted
+Publishing; and `.github/workflows/rhiza_release.yml`, which is kept rather than dropped —
+the exclusion protects a local edit to a synced file instead of refusing the file. In every
+other case the exclusion, not the deletion, is what makes the refusal stick — which is why
+the make entries stay after the files themselves are gone from the tree.
 
 **One bridge is left, and it is temporary.** The reusable workflows call `make`, which is
 why the shim exists at all, but `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no
@@ -135,10 +150,12 @@ and the bridge goes when that job does.
 **There were two.** `generate-matrix` ran `make -f .rhiza/rhiza.mk -s ci-os-matrix`, which
 made a *path* part of the reusable contract: this repo had to keep four repo-owned lines at
 `.rhiza/rhiza.mk` whose only caller was that step. Since `@v1.3.4` the step installs uv and
-runs `uvx rhiza-task ci-os-matrix` (jebel-quant/rhiza#1546), reading the same
-`RHIZA_CI_OS_MATRIX` out of the same `.rhiza/.env`, so the file is gone — deleted here, and
-still excluded in `.rhiza/template.yml` so the sync cannot write the template's original
-back. That step is also why the pin is at `rhiza-task@0.1.2` or later: it exports an
+runs `uvx rhiza-task ci-os-matrix` (jebel-quant/rhiza#1546), so the file is gone — deleted
+here, and still excluded in `.rhiza/template.yml` so the sync cannot write the template's
+original back. It asks the CLI for the matrix rather than reading a path, which is also what
+let `.rhiza/.env` go afterwards: the setting stayed put and only its file changed, from
+`RHIZA_CI_OS_MATRIX` there to `ci-os-matrix` in `[tool.rhiza-task]`. That step is also why
+the pin is at `rhiza-task@0.1.2` or later: it exports an
 intentionally *empty* `RHIZA_CI_OS_MATRIX` for every repo that is not the template's own,
 and 0.1.1 resolved an empty string to a value and answered `[]` — which GitHub expands to
 zero jobs rather than failing (Jebel-Quant/rhiza-task#4).
