@@ -38,6 +38,16 @@ test = ["pytest>=8.0", "pytest-cov>=5.0"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.rhiza-task]
+# The developer tasks come from `rhiza-task` on PyPI (see Makefile and CLAUDE.md); this is
+# where what used to be a make variable, or a shadowed target, is said instead.
+#
+# pytest-rhiza from PyPI, pinned exactly rather than floored: a gate that moves under you
+# is not a gate. rhiza-task's own default still names a git tag, one patch behind.
+pytest-rhiza = "pytest-rhiza==0.2.1"
+# docs/api.md is generated from the docstrings, and zensical does not ship mkdocstrings.
+mkdocs-extra-packages = ["mkdocstrings[python]"]
+
 [tool.check_test_layout]
 enforce = false
 reason = "tests sit flat in tests/, one file per module, rather than mirroring the package path the checker looks for at tests/jointview/. Per-module coverage is guaranteed instead by the full coverage gate in COVERAGE_FAIL_UNDER. Keep this string free of literal percent signs: radon reads the file through configparser, which reads them as interpolation syntax and raises."
