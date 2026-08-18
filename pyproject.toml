@@ -13,7 +13,7 @@ classifiers = [
 ]
 authors = [{ name = "Thomas Schmelzer", email = "thomas.schmelzer@gmail.com" }]
 name = "jointview"
-version = "0.3.2"
+version = "0.3.3"
 description = "A small marimo GUI for comparing two price or NAV series of a Polars DataFrame."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -57,7 +57,7 @@ Homepage = "https://github.com/Jebel-Quant/jointview"
 Repository = "https://github.com/Jebel-Quant/jointview"
 
 [tool.bumpversion]
-current_version = "0.3.2"
+current_version = "0.3.3"
 tag = false
 commit = false
 allow_dirty = false
