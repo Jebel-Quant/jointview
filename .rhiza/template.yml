@@ -13,13 +13,24 @@ exclude:
   # simply deleted, because a deletion alone is undone by the next sync.
   - docs/development
 
-  # The template's own test suite, replaced by the pytest-rhiza plugin: the same checks
-  # arrive installed (`local.mk` pins them), so a synced copy would be a second, older
-  # copy of code that is no longer edited here. Recorded as an exclusion rather than
-  # simply deleted, because a deletion alone is undone by the next sync.
+  # The make layer, replaced by the `rhiza-task` CLI on PyPI: `.rhiza/rhiza.mk` plus ten
+  # fragments under `.rhiza/make.d/`, 1023 lines synced at a template tag, for one pinned
+  # package version in `Makefile`. Recorded as exclusions rather than simply deleted,
+  # because a deletion alone is undone by the next sync.
   #
-  # Excluding it makes `rhiza-test` in quality.mk hit its "no directory" branch, which
-  # prints a WARN and exits 0 — a green gate measuring nothing. `local.mk` overriding
-  # `rhiza-test` is what stops that, so the two belong together: do not drop `local.mk`
-  # while this exclusion stands.
+  # `.rhiza/rhiza.mk` still exists here, but as four repo-owned lines answering the one
+  # caller that names the path (see the file). The exclusion is what stops the sync
+  # overwriting them with the original.
+  - .rhiza/make.d
+  - .rhiza/rhiza.mk
+
+  # The template's own test suite, replaced by the pytest-rhiza plugin: the same checks
+  # arrive installed (`[tool.rhiza-task]` in pyproject.toml pins the version), so a synced
+  # copy would be a second, older copy of code that is no longer edited here.
+  #
+  # This one used to be load-bearing in both directions: excluding the folder made
+  # `rhiza-test` in quality.mk hit its "no directory" branch, which printed a WARN and
+  # exited 0 — a green gate measuring nothing — so the `Makefile` had to shadow the target
+  # to stop that. With quality.mk gone the plugin *is* the implementation and the
+  # silent-pass branch no longer exists, so the exclusion now stands on its own.
   - .rhiza/tests

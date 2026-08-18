@@ -42,8 +42,11 @@ Tests sit flat in `tests/`, one file per module. `tests/test_columns.py` and
 make install    # venv + dependencies + pre-commit hooks
 make test       # pytest with the coverage gate
 make fmt        # ruff, markdownlint, bandit, actionlint, interrogate — the pre-commit set
-make marimo     # start the app
+uv run marimo edit src/jointview/app.py   # the app, in the editor
 ```
+
+`make marimo` is not that command: it opens `MARIMO_FOLDER` (`docs/notebooks`), which this
+repo does not have, so it skips. The notebook here is the package's own `app.py`.
 
 The gates, cheapest first:
 
@@ -52,7 +55,7 @@ The gates, cheapest first:
 | `make fmt` | pre-commit: formatting, linting, secrets, workflow validity |
 | `make typecheck` | `ty` over `src` |
 | `make docs-coverage` | interrogate — the bar is **100%**, every public object needs a docstring |
-| `make deps` | deptry (`make deptry` is the deprecated alias) |
+| `make deps` | deptry over `src` |
 | `make security` | bandit |
 | `make rhiza-test` | the template's own checks, from the `pytest-rhiza` plugin |
 | `make test` | the suite, gated at `COVERAGE_FAIL_UNDER` |
@@ -66,16 +69,23 @@ Docstring examples are executed — `pytest_rhiza.checks.test_docstrings` runs e
 as a doctest, and the README's fences are parsed too. An example that goes stale is a test
 failure, so keep them true rather than illustrative.
 
-**`make rhiza-test` and `make test-pyproject` are overridden in the `Makefile`.** They run
-the template's checks from [pytest-rhiza](https://github.com/Jebel-Quant/pytest-rhiza),
-pinned to a tag, instead of from a synced `.rhiza/tests/` folder — the same seven modules,
-installed rather than copied. `.rhiza/tests` is excluded in `.rhiza/template.yml` because
-of it, and the two are load-bearing together: without the override `rhiza-test` finds no
-directory, prints a warning and **exits 0**, so `make all` would go green measuring
-nothing, and `make test-pyproject` — which has no such guard — would break outright.
-Committed rather than left in a gitignored `local.mk` for that reason, so a fresh clone
-gets both halves; CI runs neither target either way (see Releasing, below). Both revert
-once the template ships the plugin wiring.
+**None of that is make any more.** The targets are tasks in
+[rhiza-task](https://github.com/jebel-quant/rhiza-task), pinned in `Makefile` to one
+version on PyPI; `make <anything>` is a catch-all rule forwarding to `uvx rhiza-task
+<anything>`. `.rhiza/rhiza.mk` and the ten fragments in `.rhiza/make.d/` — 1023 synced
+lines — are gone, and with them the two check overrides this file used to describe: the
+`rhiza-test` and `test-pyproject` tasks call
+[pytest-rhiza](https://github.com/Jebel-Quant/pytest-rhiza) themselves, so there is
+nothing left to shadow.
+`uvx rhiza-task list` is the same listing `make help` prints, and `uvx rhiza-task <task>
+--flag` is how you reach a flag the catch-all cannot pass, `--strict` above all: it turns a
+gate that found nothing to measure from a yellow line into a red one.
+
+What the repo still says for itself now has a home that is not a make variable:
+`[tool.rhiza-task]` in `pyproject.toml` pins pytest-rhiza to an exact PyPI version rather
+than the package's default git tag, and adds `mkdocstrings[python]` to the book build.
+`.rhiza/.env` keeps `SOURCE_FOLDER`, `TYPECHECKER` and the CI OS matrix, unchanged and read
+by both the CLI and the workflows.
 
 ## What this repo owns, and what it does not
 
@@ -86,9 +96,9 @@ is generated, so treat it as the authority rather than this table.
 **Template-owned — do not edit here.** Changes are made upstream at `jebel-quant/rhiza`
 and arrive via `/rhiza:update`; edits made locally are overwritten by the next sync.
 
-- `.rhiza/` in its entirety, including `.rhiza/rhiza.mk` — except `.rhiza/template.yml`,
-  which is the repo's own pointer at the template and is the one file the sync will never
-  overwrite
+- `.rhiza/` in its entirety — except `.rhiza/template.yml`, the repo's own pointer at the
+  template and the one file the sync will never overwrite, and `.rhiza/rhiza.mk`, which
+  is now four repo-owned lines (below) rather than the template's 200
 - `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.3.3`
 - `.pre-commit-config.yaml`, `pytest.ini`, `ruff.toml`
 - `docs/mkdocs-base.yml`, `docs/index.md`
@@ -98,15 +108,28 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. Two entries stand: `docs/development/`,
-where the template's `MARIMO.md` and `TESTS.md` were dropped in #24, and `.rhiza/tests/`,
-dropped in favour of the `pytest-rhiza` plugin. In both cases the exclusion, not the
+a directory entry covering everything beneath it. Four entries stand: `docs/development/`,
+where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
+dropped in favour of the `pytest-rhiza` plugin; and `.rhiza/make.d/` with
+`.rhiza/rhiza.mk`, dropped in favour of `rhiza-task`. In each case the exclusion, not the
 deletion, is what keeps them gone.
 
-`Makefile` sets two variables, includes `.rhiza/rhiza.mk`, and optionally includes a
-gitignored `local.mk` last. It was a four-line shim until the two check overrides above
-moved in; anything that must survive a clone belongs there, and genuinely local targets in
-`local.mk`, which is included after and so still wins.
+**Two bridges keep the `@v1.3.3` workflows working across that change, and both are
+temporary.** The reusable workflows call `make`, which is why the shim exists at all, but
+two jobs need more than a forwarding rule:
+
+- `rhiza_ci.yml`'s `generate-matrix` job runs `make -f .rhiza/rhiza.mk -s ci-os-matrix` in
+  a job that installs no uv. That is the whole reason a file still sits at that path: it
+  reads `RHIZA_CI_OS_MATRIX` out of `.rhiza/.env` and echoes it, in make, needing nothing.
+- `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no `astral-sh/setup-uv` step,
+  because the retired make layer bootstrapped uv itself. `Makefile` keeps that fallback:
+  when `uvx` is not on `PATH` it installs uv into the gitignored `./bin`, which is also
+  prepended to `PATH`. Every other job sets uv up first and never triggers it.
+
+Both go away when the reusable workflows invoke the CLI directly. `Makefile` otherwise
+holds one variable — the `rhiza-task` version, which is the entire version contract — and
+optionally includes a gitignored `local.mk` last; a repo-specific target belongs in either,
+and an explicit rule in both beats the catch-all.
 
 ## Releasing
 

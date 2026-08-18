@@ -1,63 +1,71 @@
-## Makefile (repo-owned)
-# Keep this file small. It can be edited without breaking template sync.
-
-LOGO_FILE=.rhiza/assets/rhiza-logo.svg
-
-# Override template default: include mkdocstrings plugin for API docs
-MKDOCS_EXTRA_PACKAGES = --with 'mkdocstrings[python]'
-
-# Always include the Rhiza API (template-managed)
-include .rhiza/rhiza.mk
-
-# --- The rhiza checks come from pytest-rhiza, not from a synced .rhiza/tests folder ----
+## Makefile (repo-owned) -- from `uvx rhiza-task shim > Makefile`, plus the bootstrap bridge below
 #
-# Both recipes below shadow template-owned ones, which is why they live here rather than
-# in the fragments that define them: `.rhiza/make.d/` must not be edited locally. Make
-# announces each shadowing at parse time ("overriding commands for target"); those lines
-# are the mechanism working, not a fault.
+# This replaces `.rhiza/rhiza.mk` and the ten fragments in `.rhiza/make.d/`: 1023 synced
+# lines, at a template tag, for one pinned package version.
 #
-# Committed rather than left in a gitignored `local.mk` because the exclusion in
-# `.rhiza/template.yml` is committed: without these, a fresh clone has `make test-pyproject`
-# outright broken and `make rhiza-test` silently passing over nothing. Not a CI argument —
-# the reusable workflow at v1.3.3 runs neither target. The rationale for the whole
-# arrangement is in CLAUDE.md and `.rhiza/template.yml`.
-
-# Pinned to a tag rather than a branch: a gate that moves under you is not a gate.
-PYTEST_RHIZA = pytest-rhiza @ git+https://github.com/Jebel-Quant/pytest-rhiza@v0.2.0
-
-# One module per file the template used to sync. Upstream the intent is that each bundle's
-# own fragment appends its line (`RHIZA_CHECKS += ...`), keeping selection at sync time;
-# with the template unchanged they are spelled out here — `core` contributing the first
-# two, `python-core` the next two, `tests` the last. The Rust and Go modules ship in the
-# same distribution and are simply never named.
+# `make` stays the front door. It is what a stranger types in an unfamiliar repository,
+# what a decade of muscle memory reaches for, and what keeps the reusable workflows at
+# @v1.3.3 -- which call `make test`, `make fmt`, `make book` -- working unchanged. It just
+# no longer *contains* anything.
 #
-# `RHIZA_DOCTEST_FOLDERS` is deliberately not passed: upstream's `quality.mk` sets it from
-# `DOCSTRING_FOLDERS`, which does not exist at v1.3.3, so `test_docstrings` falls back to
-# `SOURCE_FOLDER` from `.rhiza/.env` — `src`, where this project's Python lives. Revisit if
-# that stops being true.
-RHIZA_CHECKS = \
-	pytest_rhiza.checks.test_readme \
-	pytest_rhiza.checks.test_release_tags \
-	pytest_rhiza.checks.test_pyproject \
-	pytest_rhiza.checks.test_docstrings \
-	pytest_rhiza.checks.test_readme_validation
+# RHIZA_TASK is the entire version contract. Bumping it is the migration that used to be
+# `/rhiza:update` re-syncing eleven .mk files and reconciling whatever had been shadowed.
+# Everything this repo used to say in make variables now lives in `[tool.rhiza-task]` in
+# pyproject.toml, and everything it used to say by shadowing a target is the package's
+# default. See CLAUDE.md.
+RHIZA_TASK ?= rhiza-task@0.1.1
 
-rhiza-test: install ## run the rhiza checks from pytest-rhiza
-	@printf "${BLUE}[INFO] Running rhiza checks from pytest-rhiza${RESET}\n"
-	@${UV_BIN} run --with "${PYTEST_RHIZA}" pytest --pyargs ${RHIZA_CHECKS}
+# --- Bootstrap bridge -------------------------------------------------------------------
+#
+# `uvx rhiza-task` presupposes uv, which is the point: the retired make layer had to curl
+# `astral.sh/uv/install.sh` into `./bin` because make cannot assume it. One caller still
+# needs that bootstrap. rhiza_ci.yml@v1.3.3's `pre-commit` job runs `make fmt` with no
+# `astral-sh/setup-uv` step, relying on exactly this; every other job installs uv first.
+#
+# So: resolve uvx once, and only when it cannot be found make the install a prerequisite of
+# every target. Once installed the file exists, so the recipe runs at most once. `./bin` is
+# gitignored, and `PATH` is extended for that case alone so that the task process finds the
+# matching `uv` beside it. Delete the whole block when the reusable workflows install uv.
+#
+# The recipes call `$(UVX)` by path rather than by name because make execs a single-command
+# recipe itself, without a shell, and that lookup uses the PATH make started with -- so an
+# exported PATH reaches the child process but not the command make is trying to run.
+UVX := $(shell command -v uvx 2>/dev/null)
+ifeq ($(UVX),)
+UVX := $(CURDIR)/bin/uvx
+UVX_BOOTSTRAP := $(UVX)
+export PATH := $(CURDIR)/bin:$(PATH)
+endif
 
-# Unlike `rhiza-test` and `docs-coverage`, python.mk's recipe for this target names
-# `.rhiza/tests/test_pyproject.py` with no existence guard, so the deleted folder breaks it
-# outright rather than degrading it. Same module through the plugin; reporting flags copied
-# from the template's recipe verbatim.
-test-pyproject: install ## run pyproject.toml structure tests
-	@${UV_BIN} run --with "${PYTEST_RHIZA}" pytest --pyargs pytest_rhiza.checks.test_pyproject \
-		-v \
-		--tb=long \
-		--showlocals \
-		-rA \
-		--durations=0 \
-		--no-header
+$(CURDIR)/bin/uvx:
+	@printf '[INFO] uvx not found -- installing uv into ./bin\n'
+	@mkdir -p bin
+	@curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR="$(CURDIR)/bin" UV_NO_MODIFY_PATH=1 sh
 
-# Optional: developer-local extensions (not committed). Last, so it can override the above.
+.DEFAULT_GOAL := help
+
+help: $(UVX_BOOTSTRAP)
+	@$(UVX) $(RHIZA_TASK) list
+
+# `%:` matches any target make cannot otherwise resolve. Two caveats, both survivable: a
+# typo is routed here too (the CLI's "unknown task" error is the backstop), and a task
+# needing flags wants `uvx rhiza-task <task> --flag` directly. `.PHONY` cannot name unknown
+# targets, so a *file* sharing a task's name would shadow it -- none do.
+%: $(UVX_BOOTSTRAP)
+	@$(UVX) $(RHIZA_TASK) $@
+
+# Repo-specific one-offs live here, where they always belonged, and win over the catch-all
+# because an explicit rule beats a pattern rule. This is what `local.mk` was for.
 -include local.mk
+
+# A makefile is also a target make tries to *remake* before running anything, and with a
+# match-anything rule in scope that attempt is routed to the CLI -- so every invocation
+# would begin with "unknown task: local.mk". An explicit rule with an empty recipe satisfies
+# the remake attempt silently.
+#
+# `Makefile` needs one too, which the generated shim does not: make exempts an existing
+# makefile from a match-anything rule only while that rule has no prerequisites, and the
+# bootstrap above gives it one. Without this line `make help` tries to remake the Makefile
+# by asking the CLI to build a task called "Makefile".
+local.mk: ;
+Makefile: ;
