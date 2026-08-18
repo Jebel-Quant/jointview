@@ -20,8 +20,9 @@ exclude:
   #
   # `.rhiza/rhiza.mk` outlived the rest by one caller: rhiza_ci.yml's `generate-matrix` job
   # ran `make -f .rhiza/rhiza.mk -s ci-os-matrix`, so a repo with no make layer still had to
-  # keep four lines at that path. @v1.3.4 asks the CLI instead (jebel-quant/rhiza#1546), and
-  # the file is gone; the exclusion is all that stays behind.
+  # keep four lines at that path. jebel-quant/rhiza#1546 asks the CLI instead, but it is
+  # unmerged and no tag carries it, so the caller was cut the other way: rhiza_ci.yml is
+  # excluded below and spells the matrix out. The file is gone; the exclusion stays behind.
   - .rhiza/make.d
   - .rhiza/rhiza.mk
 
@@ -43,3 +44,11 @@ exclude:
   # Excluding it keeps that edit, at the price of not receiving upstream fixes to the
   # release pipeline: check the template's version by hand when one lands.
   - .github/workflows/rhiza_release.yml
+
+  # The CI workflow, synced whole rather than delegating, for one line. Its
+  # `generate-matrix` job reads the OS matrix by running `make -f .rhiza/rhiza.mk -s
+  # ci-os-matrix`, and that makefile is excluded above — so calling the reusable workflow
+  # fails before any test runs. Until jebel-quant/rhiza#1546 merges and ships in a tag,
+  # the matrix is hardcoded in the copy. Everything else is byte-identical to v1.3.3, so
+  # reverting is a one-line diff once the pin can move.
+  - .github/workflows/rhiza_ci.yml
