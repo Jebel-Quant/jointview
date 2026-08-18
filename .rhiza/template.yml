@@ -12,3 +12,14 @@ exclude:
   # a page mkdocs does not link to is a page nobody reads. Recorded here rather than
   # simply deleted, because a deletion alone is undone by the next sync.
   - docs/development
+
+  # The template's own test suite, replaced by the pytest-rhiza plugin: the same checks
+  # arrive installed (`local.mk` pins them), so a synced copy would be a second, older
+  # copy of code that is no longer edited here. Recorded as an exclusion rather than
+  # simply deleted, because a deletion alone is undone by the next sync.
+  #
+  # Excluding it makes `rhiza-test` in quality.mk hit its "no directory" branch, which
+  # prints a WARN and exits 0 — a green gate measuring nothing. `local.mk` overriding
+  # `rhiza-test` is what stops that, so the two belong together: do not drop `local.mk`
+  # while this exclusion stands.
+  - .rhiza/tests

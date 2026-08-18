@@ -54,7 +54,7 @@ The gates, cheapest first:
 | `make docs-coverage` | interrogate — the bar is **100%**, every public object needs a docstring |
 | `make deps` | deptry (`make deptry` is the deprecated alias) |
 | `make security` | bandit |
-| `make rhiza-test` | the template's own bundled suite under `.rhiza/tests/` |
+| `make rhiza-test` | the template's own checks, from the `pytest-rhiza` plugin |
 | `make test` | the suite, gated at `COVERAGE_FAIL_UNDER` |
 
 `make all` runs the lot. `make help` lists every target.
@@ -62,9 +62,18 @@ The gates, cheapest first:
 Two bars are set higher than the defaults and are worth not sliding back on: **100%
 docstring coverage** and **100% line coverage** on `src/`, against a 90% gate.
 
-Docstring examples are executed — `.rhiza/tests/test_docstrings.py` runs every `>>>` as
-a doctest, and the README's fences are parsed too. An example that goes stale is a test
+Docstring examples are executed — `pytest_rhiza.checks.test_docstrings` runs every `>>>`
+as a doctest, and the README's fences are parsed too. An example that goes stale is a test
 failure, so keep them true rather than illustrative.
+
+**`make rhiza-test` and `make test-pyproject` are overridden in `local.mk`.** They run the
+template's checks from [pytest-rhiza](https://github.com/Jebel-Quant/pytest-rhiza), pinned
+to a tag, instead of from a synced `.rhiza/tests/` folder — the same seven modules,
+installed rather than copied. `.rhiza/tests` is excluded in `.rhiza/template.yml` because
+of it, and the two changes are load-bearing together: without the override, `rhiza-test`
+finds no directory, prints a warning and **exits 0**, so `make all` goes green measuring
+nothing. `local.mk` is gitignored, so a fresh clone has neither half — see the comments in
+`.rhiza/template.yml`. Both revert once the template ships the plugin wiring itself.
 
 ## What this repo owns, and what it does not
 
@@ -75,9 +84,9 @@ is generated, so treat it as the authority rather than this table.
 **Template-owned — do not edit here.** Changes are made upstream at `jebel-quant/rhiza`
 and arrive via `/rhiza:update`; edits made locally are overwritten by the next sync.
 
-- `.rhiza/` in its entirety, including `.rhiza/rhiza.mk` and `.rhiza/tests/` — except
-  `.rhiza/template.yml`, which is the repo's own pointer at the template and is the one
-  file the sync will never overwrite
+- `.rhiza/` in its entirety, including `.rhiza/rhiza.mk` — except `.rhiza/template.yml`,
+  which is the repo's own pointer at the template and is the one file the sync will never
+  overwrite
 - `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.3.3`
 - `.pre-commit-config.yaml`, `pytest.ini`, `ruff.toml`
 - `docs/mkdocs-base.yml`, `docs/index.md`
@@ -87,9 +96,10 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. `docs/development/` is the standing
-case: the template's `MARIMO.md` and `TESTS.md` were dropped in #24, and the exclusion
-is what keeps them dropped.
+a directory entry covering everything beneath it. Two entries stand: `docs/development/`,
+where the template's `MARIMO.md` and `TESTS.md` were dropped in #24, and `.rhiza/tests/`,
+dropped in favour of the `pytest-rhiza` plugin. In both cases the exclusion, not the
+deletion, is what keeps them gone.
 
 `Makefile` is a four-line shim: it sets two variables, includes `.rhiza/rhiza.mk`, and
 optionally includes a gitignored `local.mk`. Put local targets in `local.mk`.
