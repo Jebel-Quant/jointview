@@ -66,14 +66,14 @@ Docstring examples are executed — `pytest_rhiza.checks.test_docstrings` runs e
 as a doctest, and the README's fences are parsed too. An example that goes stale is a test
 failure, so keep them true rather than illustrative.
 
-**`make rhiza-test` and `make test-pyproject` are overridden in `local.mk`.** They run the
-template's checks from [pytest-rhiza](https://github.com/Jebel-Quant/pytest-rhiza), pinned
-to a tag, instead of from a synced `.rhiza/tests/` folder — the same seven modules,
+**`make rhiza-test` and `make test-pyproject` are overridden in the `Makefile`.** They run
+the template's checks from [pytest-rhiza](https://github.com/Jebel-Quant/pytest-rhiza),
+pinned to a tag, instead of from a synced `.rhiza/tests/` folder — the same seven modules,
 installed rather than copied. `.rhiza/tests` is excluded in `.rhiza/template.yml` because
-of it, and the two changes are load-bearing together: without the override, `rhiza-test`
-finds no directory, prints a warning and **exits 0**, so `make all` goes green measuring
-nothing. `local.mk` is gitignored, so a fresh clone has neither half — see the comments in
-`.rhiza/template.yml`. Both revert once the template ships the plugin wiring itself.
+of it, and the two are load-bearing together: without the override `rhiza-test` finds no
+directory, prints a warning and **exits 0**, so `make all` would go green measuring
+nothing. Committed rather than left in a gitignored `local.mk` for exactly that reason —
+CI needs the replacement too. Both revert once the template ships the plugin wiring.
 
 ## What this repo owns, and what it does not
 
@@ -101,8 +101,10 @@ where the template's `MARIMO.md` and `TESTS.md` were dropped in #24, and `.rhiza
 dropped in favour of the `pytest-rhiza` plugin. In both cases the exclusion, not the
 deletion, is what keeps them gone.
 
-`Makefile` is a four-line shim: it sets two variables, includes `.rhiza/rhiza.mk`, and
-optionally includes a gitignored `local.mk`. Put local targets in `local.mk`.
+`Makefile` sets two variables, includes `.rhiza/rhiza.mk`, and optionally includes a
+gitignored `local.mk` last. It was a four-line shim until the two check overrides above
+moved in; anything that must survive a clone belongs there, and genuinely local targets in
+`local.mk`, which is included after and so still wins.
 
 ## Releasing
 
