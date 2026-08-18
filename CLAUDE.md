@@ -97,9 +97,10 @@ is generated, so treat it as the authority rather than this table.
 and arrive via `/rhiza:update`; edits made locally are overwritten by the next sync.
 
 - `.rhiza/` in its entirety — except `.rhiza/template.yml`, the repo's own pointer at the
-  template and the one file the sync will never overwrite, and `.rhiza/rhiza.mk`, which
-  is now four repo-owned lines (below) rather than the template's 200
-- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.3.3`
+  template and the one file the sync will never overwrite
+- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.3.3`,
+  except `rhiza_ci.yml`, which is called at `@v1.3.4` for the reason below. The next
+  `/rhiza:update` levels them and moves `.rhiza/template.lock` with them.
 - `.pre-commit-config.yaml`, `pytest.ini`, `ruff.toml`
 - `docs/mkdocs-base.yml`, `docs/index.md`
 
@@ -112,24 +113,30 @@ a directory entry covering everything beneath it. Four entries stand: `docs/deve
 where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
 dropped in favour of the `pytest-rhiza` plugin; and `.rhiza/make.d/` with
 `.rhiza/rhiza.mk`, dropped in favour of `rhiza-task`. In each case the exclusion, not the
-deletion, is what keeps them gone.
+deletion, is what keeps them gone — which is why the last two entries stay after the files
+themselves are gone from the tree.
 
-**Two bridges keep the `@v1.3.3` workflows working across that change, and both are
-temporary.** The reusable workflows call `make`, which is why the shim exists at all, but
-two jobs need more than a forwarding rule:
+**One bridge is left, and it is temporary.** The reusable workflows call `make`, which is
+why the shim exists at all, but `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no
+`astral-sh/setup-uv` step, because the retired make layer bootstrapped uv itself. `Makefile`
+keeps that fallback: when `uvx` is not on `PATH` it installs uv into the gitignored `./bin`,
+which is also prepended to `PATH`. Every other job sets uv up first and never triggers it,
+and the bridge goes when that job does.
 
-- `rhiza_ci.yml`'s `generate-matrix` job runs `make -f .rhiza/rhiza.mk -s ci-os-matrix` in
-  a job that installs no uv. That is the whole reason a file still sits at that path: it
-  reads `RHIZA_CI_OS_MATRIX` out of `.rhiza/.env` and echoes it, in make, needing nothing.
-- `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no `astral-sh/setup-uv` step,
-  because the retired make layer bootstrapped uv itself. `Makefile` keeps that fallback:
-  when `uvx` is not on `PATH` it installs uv into the gitignored `./bin`, which is also
-  prepended to `PATH`. Every other job sets uv up first and never triggers it.
+**There were two.** `generate-matrix` ran `make -f .rhiza/rhiza.mk -s ci-os-matrix`, which
+made a *path* part of the reusable contract: this repo had to keep four repo-owned lines at
+`.rhiza/rhiza.mk` whose only caller was that step. Since `@v1.3.4` the step installs uv and
+runs `uvx rhiza-task ci-os-matrix` (jebel-quant/rhiza#1546), reading the same
+`RHIZA_CI_OS_MATRIX` out of the same `.rhiza/.env`, so the file is gone — deleted here, and
+still excluded in `.rhiza/template.yml` so the sync cannot write the template's original
+back. That step is also why the pin is at `rhiza-task@0.1.2` or later: it exports an
+intentionally *empty* `RHIZA_CI_OS_MATRIX` for every repo that is not the template's own,
+and 0.1.1 resolved an empty string to a value and answered `[]` — which GitHub expands to
+zero jobs rather than failing (Jebel-Quant/rhiza-task#4).
 
-Both go away when the reusable workflows invoke the CLI directly. `Makefile` otherwise
-holds one variable — the `rhiza-task` version, which is the entire version contract — and
-optionally includes a gitignored `local.mk` last; a repo-specific target belongs in either,
-and an explicit rule in both beats the catch-all.
+`Makefile` otherwise holds one variable — the `rhiza-task` version, which is the entire
+version contract — and optionally includes a gitignored `local.mk` last; a repo-specific
+target belongs in either, and an explicit rule in both beats the catch-all.
 
 ## Releasing
 

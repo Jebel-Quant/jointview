@@ -18,9 +18,10 @@ exclude:
   # package version in `Makefile`. Recorded as exclusions rather than simply deleted,
   # because a deletion alone is undone by the next sync.
   #
-  # `.rhiza/rhiza.mk` still exists here, but as four repo-owned lines answering the one
-  # caller that names the path (see the file). The exclusion is what stops the sync
-  # overwriting them with the original.
+  # `.rhiza/rhiza.mk` outlived the rest by one caller: rhiza_ci.yml's `generate-matrix` job
+  # ran `make -f .rhiza/rhiza.mk -s ci-os-matrix`, so a repo with no make layer still had to
+  # keep four lines at that path. @v1.3.4 asks the CLI instead (jebel-quant/rhiza#1546), and
+  # the file is gone; the exclusion is all that stays behind.
   - .rhiza/make.d
   - .rhiza/rhiza.mk
 
