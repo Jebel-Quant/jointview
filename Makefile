@@ -1,63 +1,70 @@
-## Makefile (repo-owned)
-# Keep this file small. It can be edited without breaking template sync.
-
-LOGO_FILE=.rhiza/assets/rhiza-logo.svg
-
-# Override template default: include mkdocstrings plugin for API docs
-MKDOCS_EXTRA_PACKAGES = --with 'mkdocstrings[python]'
-
-# Always include the Rhiza API (template-managed)
-include .rhiza/rhiza.mk
-
-# --- The rhiza checks come from pytest-rhiza, not from a synced .rhiza/tests folder ----
+## Makefile — a compatibility shim. The tasks live in `justfile`.
 #
-# Both recipes below shadow template-owned ones, which is why they live here rather than
-# in the fragments that define them: `.rhiza/make.d/` must not be edited locally. Make
-# announces each shadowing at parse time ("overriding commands for target"); those lines
-# are the mechanism working, not a fault.
+# Nothing is defined here. This file exists for one reason: rhiza's reusable workflows at
+# v1.3.3 invoke `make <target>` inside the caller repo, so `make` is the CI interface
+# whether or not this project uses it locally. The call sites, all upstream:
 #
-# Committed rather than left in a gitignored `local.mk` because the exclusion in
-# `.rhiza/template.yml` is committed: without these, a fresh clone has `make test-pyproject`
-# outright broken and `make rhiza-test` silently passing over nothing. Not a CI argument —
-# the reusable workflow at v1.3.3 runs neither target. The rationale for the whole
-# arrangement is in CLAUDE.md and `.rhiza/template.yml`.
-
-# Pinned to a tag rather than a branch: a gate that moves under you is not a gate.
-PYTEST_RHIZA = pytest-rhiza @ git+https://github.com/Jebel-Quant/pytest-rhiza@v0.2.0
-
-# One module per file the template used to sync. Upstream the intent is that each bundle's
-# own fragment appends its line (`RHIZA_CHECKS += ...`), keeping selection at sync time;
-# with the template unchanged they are spelled out here — `core` contributing the first
-# two, `python-core` the next two, `tests` the last. The Rust and Go modules ship in the
-# same distribution and are simply never named.
+#   rhiza_ci.yml         test, typecheck, deps, fmt, docs-coverage, security, license
+#   rhiza_book.yml       book
+#   rhiza_benchmark.yml  benchmark
+#   rhiza_weekly.yml     test, semgrep
 #
-# `RHIZA_DOCTEST_FOLDERS` is deliberately not passed: upstream's `quality.mk` sets it from
-# `DOCSTRING_FOLDERS`, which does not exist at v1.3.3, so `test_docstrings` falls back to
-# `SOURCE_FOLDER` from `.rhiza/.env` — `src`, where this project's Python lives. Revisit if
-# that stops being true.
-RHIZA_CHECKS = \
-	pytest_rhiza.checks.test_readme \
-	pytest_rhiza.checks.test_release_tags \
-	pytest_rhiza.checks.test_pyproject \
-	pytest_rhiza.checks.test_docstrings \
-	pytest_rhiza.checks.test_readme_validation
+# Read off tag v1.3.3, not rhiza's main — main has since added `make rhiza-test` to
+# rhiza_ci.yml, which will arrive here with the next `/rhiza:update`.
+#
+# Every goal is forwarded to `just`, so all of those keep working unchanged. Delete this
+# file once the reusable workflows call `just` themselves.
+#
+# `.rhiza/rhiza.mk` is deliberately no longer included. `.rhiza/make.d/*.mk` stays on disk
+# because it is template-owned and the sync writes it back, but it is dormant — the
+# fragments are not read, and the two recipes this Makefile used to *shadow* (`rhiza-test`,
+# `test-pyproject`) are ordinary recipes in the justfile now, so make no longer announces
+# "overriding commands for target" at parse time.
+#
+# One workflow bypasses this file and reads the template's make directly: rhiza_ci.yml
+# runs `make -f .rhiza/rhiza.mk -s ci-os-matrix` to read RHIZA_CI_OS_MATRIX out of
+# `.rhiza/.env`. That path is untouched, which is why `.rhiza/.env` must stay.
 
-rhiza-test: install ## run the rhiza checks from pytest-rhiza
-	@printf "${BLUE}[INFO] Running rhiza checks from pytest-rhiza${RESET}\n"
-	@${UV_BIN} run --with "${PYTEST_RHIZA}" pytest --pyargs ${RHIZA_CHECKS}
+JUST := sh scripts/just.sh
 
-# Unlike `rhiza-test` and `docs-coverage`, python.mk's recipe for this target names
-# `.rhiza/tests/test_pyproject.py` with no existence guard, so the deleted folder breaks it
-# outright rather than degrading it. Same module through the plugin; reporting flags copied
-# from the template's recipe verbatim.
-test-pyproject: install ## run pyproject.toml structure tests
-	@${UV_BIN} run --with "${PYTEST_RHIZA}" pytest --pyargs pytest_rhiza.checks.test_pyproject \
-		-v \
-		--tb=long \
-		--showlocals \
-		-rA \
-		--durations=0 \
-		--no-header
+# rhiza_marimo.yml parses MARIMO_FOLDER by including this file and echoing the variable,
+# so the include has to survive even though the justfile no longer reads .env.
+-include .rhiza/.env
 
-# Optional: developer-local extensions (not committed). Last, so it can override the above.
--include local.mk
+.DEFAULT_GOAL := help
+
+# Named explicitly rather than left to the catch-all, so the `check-makefile-targets`
+# pre-commit hook can still find the four targets it looks for.
+.PHONY: help install test fmt
+
+help:
+	@$(JUST) --list
+
+install:
+	@$(JUST) install
+
+test:
+	@$(JUST) test
+
+fmt:
+	@$(JUST) fmt
+
+# Everything else. FORCE keeps the rule permanently out of date, since none of these
+# goals name a file.
+%: FORCE
+	@$(JUST) $@
+
+# Without these, make would try to remake its own makefiles *through* the catch-all above,
+# forwarding a filename to just. The `%.mk` rule is the load-bearing one: rhiza_marimo.yml
+# reads MARIMO_FOLDER with `make -f Makefile -f -`, and `make -f Makefile -f some.mk` fails
+# outright without it. A pattern rule with a longer stem loses, so `%.mk` beats `%`.
+#
+# `.DEFAULT` would sidestep makefile remaking entirely and need no guards, but it ignores
+# prerequisites — so a stray file named `book` or `test` at the repo root would silently
+# report "up to date" instead of running the recipe. The catch-all plus FORCE does not.
+Makefile: ;
+%.mk: ;
+.rhiza/.env: ;
+
+.PHONY: FORCE
+FORCE: ;
