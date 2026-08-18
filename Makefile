@@ -4,23 +4,25 @@
 # lines, at a template tag, for one pinned package version.
 #
 # `make` stays the front door. It is what a stranger types in an unfamiliar repository,
-# what a decade of muscle memory reaches for, and what keeps the reusable workflows at
-# @v1.3.3 -- which call `make test`, `make fmt`, `make book` -- working unchanged. It just
-# no longer *contains* anything.
+# what a decade of muscle memory reaches for, and what keeps the reusable workflows -- which
+# call `make test`, `make fmt`, `make book` -- working unchanged. It just no longer
+# *contains* anything.
 #
 # RHIZA_TASK is the entire version contract. Bumping it is the migration that used to be
 # `/rhiza:update` re-syncing eleven .mk files and reconciling whatever had been shadowed.
 # Everything this repo used to say in make variables now lives in `[tool.rhiza-task]` in
 # pyproject.toml, and everything it used to say by shadowing a target is the package's
 # default. See CLAUDE.md.
-RHIZA_TASK ?= rhiza-task@0.1.1
+RHIZA_TASK ?= rhiza-task@0.1.2
 
 # --- Bootstrap bridge -------------------------------------------------------------------
 #
 # `uvx rhiza-task` presupposes uv, which is the point: the retired make layer had to curl
 # `astral.sh/uv/install.sh` into `./bin` because make cannot assume it. One caller still
-# needs that bootstrap. rhiza_ci.yml@v1.3.3's `pre-commit` job runs `make fmt` with no
+# needs that bootstrap. rhiza_ci.yml's `pre-commit` job runs `make fmt` with no
 # `astral-sh/setup-uv` step, relying on exactly this; every other job installs uv first.
+# It is the last of the two bridges: `generate-matrix` used to be the other, and stopped
+# naming `.rhiza/rhiza.mk` in @v1.3.4, which is what let that file go.
 #
 # So: resolve uvx once, and only when it cannot be found make the install a prerequisite of
 # every target. Once installed the file exists, so the recipe runs at most once. `./bin` is
