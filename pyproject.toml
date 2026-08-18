@@ -47,6 +47,13 @@ testpaths = ["tests"]
 pytest-rhiza = "pytest-rhiza==0.2.1"
 # docs/api.md is generated from the docstrings, and zensical does not ship mkdocstrings.
 mkdocs-extra-packages = ["mkdocstrings[python]"]
+# The CI OS matrix, moved here when `.rhiza/.env` went: it is the only setting that file
+# still carried which is not already rhiza-task's own default. `rhiza_ci.yml`'s
+# `generate-matrix` job asks `uvx rhiza-task ci-os-matrix`, which reads this table, so the
+# three-OS fan-out survives the file. Leaving it unset would silently narrow CI to
+# ubuntu-latest alone — the package builds pure-Python wheels but reads paths and spawns a
+# marimo server, which is exactly what Windows and macOS are here to catch.
+ci-os-matrix = ["ubuntu-latest", "macos-latest", "windows-latest"]
 
 [tool.check_test_layout]
 enforce = false

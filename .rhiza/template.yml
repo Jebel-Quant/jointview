@@ -43,3 +43,21 @@ exclude:
   # Excluding it keeps that edit, at the price of not receiving upstream fixes to the
   # release pipeline: check the template's version by hand when one lands.
   - .github/workflows/rhiza_release.yml
+
+  # `.rhiza/.env`, and `.rhiza/.gitignore` whose single line (`!.env`) existed only to
+  # un-ignore it against the root `.gitignore`. Of the four settings the file carried, three
+  # — SOURCE_FOLDER=src, MARIMO_FOLDER=docs/notebooks and TYPECHECKER=ty — are already
+  # rhiza-task 0.1.2's dataclass defaults, so the file was restating them. The fourth, the
+  # three-OS CI matrix, is not a default and now lives in
+  # `[tool.rhiza-task]` in pyproject.toml, one layer *above* .env in the resolution order.
+  # Recorded here rather than simply deleted, because a deletion alone is undone by the
+  # next sync.
+  - .rhiza/.env
+  - .rhiza/.gitignore
+
+  # The template's PAT_TOKEN and release-secret walkthrough. It documents secrets a
+  # consumer configures once in the GitHub UI, addressed to whoever set the repo up rather
+  # than to anyone reading the tree — and this repo publishes to PyPI by Trusted Publishing,
+  # so the page's central subject does not apply. Upstream is where it belongs, and where it
+  # stays.
+  - .github/CONFIG.md
