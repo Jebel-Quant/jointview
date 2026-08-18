@@ -101,20 +101,29 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 - `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.3.3`,
   except `rhiza_ci.yml`, which is called at `@v1.3.4` for the reason below. The next
   `/rhiza:update` levels them and moves `.rhiza/template.lock` with them.
+  **`rhiza_release.yml` is the exception and is now repo-owned**: it is synced whole
+  rather than delegating, because the PyPI publish has to run under this repository's
+  identity for Trusted Publishing. Its conda and devcontainer jobs were removed — no
+  `.devcontainer` here, no feedstock waiting on a grayskull recipe — and an `exclude:`
+  entry is what keeps them removed. The price is that upstream fixes to the release
+  pipeline no longer arrive; check the template's copy by hand when one lands.
 - `.pre-commit-config.yaml`, `pytest.ini`, `ruff.toml`
 - `docs/mkdocs-base.yml`, `docs/index.md`
 
 **Repo-owned — edit freely.** `src/`, `tests/`, `pyproject.toml`, `README.md`,
-`mkdocs.yml`, `docs/api.md`, `.rhiza/template.yml`, and this file.
+`mkdocs.yml`, `docs/api.md`, `.rhiza/template.yml`,
+`.github/workflows/rhiza_release.yml`, and this file.
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. Four entries stand: `docs/development/`,
+a directory entry covering everything beneath it. Five entries stand: `docs/development/`,
 where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
-dropped in favour of the `pytest-rhiza` plugin; and `.rhiza/make.d/` with
-`.rhiza/rhiza.mk`, dropped in favour of `rhiza-task`. In each case the exclusion, not the
-deletion, is what keeps them gone — which is why the last two entries stay after the files
-themselves are gone from the tree.
+dropped in favour of the `pytest-rhiza` plugin; `.rhiza/make.d/` with `.rhiza/rhiza.mk`,
+dropped in favour of `rhiza-task`; and `.github/workflows/rhiza_release.yml`, which is
+kept rather than dropped — the exclusion protects a local edit to a synced file instead of
+refusing the file. In each case the exclusion, not the deletion, is what makes the refusal
+stick — which is why the two make entries stay after the files themselves are gone from
+the tree.
 
 **One bridge is left, and it is temporary.** The reusable workflows call `make`, which is
 why the shim exists at all, but `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no

@@ -35,3 +35,11 @@ exclude:
   # to stop that. With quality.mk gone the plugin *is* the implementation and the
   # silent-pass branch no longer exists, so the exclusion now stands on its own.
   - .rhiza/tests
+
+  # The release workflow, trimmed of its conda and devcontainer jobs. Unlike every other
+  # workflow here this file is synced whole rather than delegating to a reusable one — the
+  # PyPI publish must run under this repository's identity for Trusted Publishing — so the
+  # only place to say "this repo has no devcontainer and no feedstock" is the copy itself.
+  # Excluding it keeps that edit, at the price of not receiving upstream fixes to the
+  # release pipeline: check the template's version by hand when one lands.
+  - .github/workflows/rhiza_release.yml
