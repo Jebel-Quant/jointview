@@ -101,7 +101,7 @@ the root `.gitignore`, and with no `.env` there is nothing to un-ignore.
 ## What this repo owns, and what it does not
 
 This is a [rhiza](https://github.com/jebel-quant/rhiza)-managed repo, synced from
-template **v1.3.3**. `.rhiza/template.lock` lists every synced path; the `files:` block
+template **v1.4.2**. `.rhiza/template.lock` lists every synced path; the `files:` block
 is generated, so treat it as the authority rather than this table.
 
 **Template-owned — do not edit here.** Changes are made upstream at `jebel-quant/rhiza`
@@ -109,9 +109,10 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 - `.rhiza/` in its entirety — except `.rhiza/template.yml`, the repo's own pointer at the
   template and the one file the sync will never overwrite
-- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.3.3`,
-  except `rhiza_ci.yml`, which is called at `@v1.3.4` for the reason below. The next
-  `/rhiza:update` levels them and moves `.rhiza/template.lock` with them.
+- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.4.2`,
+  all of them: `rhiza_ci.yml` had been pinned ahead at `@v1.3.4` for the
+  `generate-matrix` reason below, and v1.4.2 levelled it with the rest. A `/rhiza:update`
+  moves the refs and `.rhiza/template.lock` together.
   **`rhiza_release.yml` is the exception and is now repo-owned**: it is synced whole
   rather than delegating, because the PyPI publish has to run under this repository's
   identity for Trusted Publishing. Its conda and devcontainer jobs were removed — no
@@ -127,7 +128,7 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. Eight entries stand: `docs/development/`,
+a directory entry covering everything beneath it. Ten entries stand: `docs/development/`,
 where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
 dropped in favour of the `pytest-rhiza` plugin; `.rhiza/make.d/` with `.rhiza/rhiza.mk`,
 dropped in favour of `rhiza-task`; `.rhiza/.env` with `.rhiza/.gitignore`, dropped once
@@ -135,10 +136,18 @@ dropped in favour of `rhiza-task`; `.rhiza/.env` with `.rhiza/.gitignore`, dropp
 a walkthrough for configuring `PAT_TOKEN` and the release secrets in the GitHub UI, which
 belongs to whoever set the repo up rather than to anyone reading the tree — and whose
 central subject, a stored PyPI credential, does not apply to a repo publishing by Trusted
-Publishing; and `.github/workflows/rhiza_release.yml`, which is kept rather than dropped —
-the exclusion protects a local edit to a synced file instead of refusing the file. In every
-other case the exclusion, not the deletion, is what makes the refusal stick — which is why
-the make entries stay after the files themselves are gone from the tree.
+Publishing; `.github/workflows/rhiza_fuzzing.yml` with `.github/workflows/rhiza_mutation.yml`,
+the two opt-in workflows v1.4.2 added, both off unless a repository variable turns them on and
+neither turned on here — there is no parser and no untrusted input in a marimo app over two
+Polars columns for a fuzzer to reach, and the assertion-strength question mutation testing
+asks is one that 100% line coverage over seven small modules already answers cheaply. Their
+gates sit in different places, which is why declining both is one decision rather than two:
+mutation's `if:` is in the stub, so the job never starts, while fuzzing's is inside the
+reusable workflow, so the job does start on every pull request in order to skip. And
+`.github/workflows/rhiza_release.yml`, which is kept rather than dropped — the exclusion
+protects a local edit to a synced file instead of refusing the file. In every other case
+the exclusion, not the deletion, is what makes the refusal stick — which is why the make
+entries stay after the files themselves are gone from the tree.
 
 **One bridge is left, and it is temporary.** The reusable workflows call `make`, which is
 why the shim exists at all, but `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no
