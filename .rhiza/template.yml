@@ -1,5 +1,5 @@
 repository: "jebel-quant/rhiza"
-ref: "v1.3.3"
+ref: "v1.4.2"
 
 profiles:
   - github-project
@@ -61,3 +61,29 @@ exclude:
   # so the page's central subject does not apply. Upstream is where it belongs, and where it
   # stays.
   - .github/CONFIG.md
+
+  # The two opt-in workflows that arrived with v1.4.2, both OFF by default and neither
+  # opted into here: `rhiza_mutation.yml` runs only when the repository variable
+  # MUTATION_ENABLED is 'true', and `rhiza_fuzzing.yml` needs FUZZING_ENABLED plus a
+  # `.clusterfuzzlite/` config this repo does not have. Mutation's gate is in the caller,
+  # so the job never starts; fuzzing's is inside the reusable workflow, so it does start
+  # on every pull request and every push to main in order to skip — a green check whose
+  # only content is that it had nothing to do.
+  #
+  # Declining them is a judgement about this package, not about the workflows: jointview
+  # is a marimo app over two Polars columns, with no parser and no untrusted input for a
+  # fuzzer to reach, and the assertion-strength question mutation testing answers is one
+  # `make test`'s 100% line coverage on ~seven small modules already answers cheaply.
+  # Recorded here rather than simply deleted, because a deletion alone is undone by the
+  # next sync.
+  - .github/workflows/rhiza_fuzzing.yml
+  - .github/workflows/rhiza_mutation.yml
+
+  # The issue forms, `bug_report.yml` and `feature_request.yml`. Two 98-line forms with
+  # required fields, arriving at a template tag, for a repository whose issues are opened by
+  # the person who wrote the code: the friction lands entirely on the one contributor a
+  # form's structure was never meant to discipline, and a required "steps to reproduce"
+  # textarea is not what makes a one-line note about a chart axis easier to file. Issues stay
+  # enabled and free-form. Recorded here rather than simply deleted, because a deletion alone
+  # is undone by the next sync.
+  - .github/ISSUE_TEMPLATE
