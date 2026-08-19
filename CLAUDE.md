@@ -128,7 +128,7 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. Ten entries stand: `docs/development/`,
+a directory entry covering everything beneath it. Eleven entries stand: `docs/development/`,
 where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
 dropped in favour of the `pytest-rhiza` plugin; `.rhiza/make.d/` with `.rhiza/rhiza.mk`,
 dropped in favour of `rhiza-task`; `.rhiza/.env` with `.rhiza/.gitignore`, dropped once
@@ -143,11 +143,19 @@ Polars columns for a fuzzer to reach, and the assertion-strength question mutati
 asks is one that 100% line coverage over seven small modules already answers cheaply. Their
 gates sit in different places, which is why declining both is one decision rather than two:
 mutation's `if:` is in the stub, so the job never starts, while fuzzing's is inside the
-reusable workflow, so the job does start on every pull request in order to skip. And
-`.github/workflows/rhiza_release.yml`, which is kept rather than dropped — the exclusion
-protects a local edit to a synced file instead of refusing the file. In every other case
-the exclusion, not the deletion, is what makes the refusal stick — which is why the make
-entries stay after the files themselves are gone from the tree.
+reusable workflow, so the job does start on every pull request in order to skip. Then
+`.github/ISSUE_TEMPLATE/`, the two issue forms — 98 lines of required fields, for a
+repository whose issues are opened by the person who wrote the code, where the friction
+lands entirely on the one contributor a form's structure was never meant to discipline.
+Issues stay enabled and free-form. And `.github/workflows/rhiza_release.yml`, which is kept
+rather than dropped — the exclusion protects a local edit to a synced file instead of
+refusing the file. In every other case the exclusion, not the deletion, is what makes the
+refusal stick — which is why the make entries stay after the files themselves are gone from
+the tree.
+
+`.github/DISCUSSION_TEMPLATE/` is the one that survived the same question, and only just:
+its three forms are inert here because Discussions is switched off on the repository, so
+they cost nothing and are already configured if it is ever switched on.
 
 **One bridge is left, and it is temporary.** The reusable workflows call `make`, which is
 why the shim exists at all, but `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no
