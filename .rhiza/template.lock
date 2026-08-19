@@ -14,6 +14,7 @@ exclude:
 - .github/CONFIG.md
 - .github/workflows/rhiza_fuzzing.yml
 - .github/workflows/rhiza_mutation.yml
+- .github/ISSUE_TEMPLATE
 templates: []
 profiles:
 - github-project
@@ -23,8 +24,6 @@ files:
 - .github/DISCUSSION_TEMPLATE/help-wanted.yml
 - .github/DISCUSSION_TEMPLATE/ideas.yml
 - .github/DISCUSSION_TEMPLATE/q-and-a.yml
-- .github/ISSUE_TEMPLATE/bug_report.yml
-- .github/ISSUE_TEMPLATE/feature_request.yml
 - .github/dependabot.yml
 - .github/release.yml
 - .github/rulesets/main-branch-protection.json
@@ -48,5 +47,5 @@ files:
 - pytest.ini
 - ruff.toml
 - tests/test_rhiza_packaging.py
-synced_at: '2026-08-19T09:16:52Z'
+synced_at: '2026-08-19T10:02:59Z'
 strategy: merge

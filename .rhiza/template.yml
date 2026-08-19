@@ -78,3 +78,12 @@ exclude:
   # next sync.
   - .github/workflows/rhiza_fuzzing.yml
   - .github/workflows/rhiza_mutation.yml
+
+  # The issue forms, `bug_report.yml` and `feature_request.yml`. Two 98-line forms with
+  # required fields, arriving at a template tag, for a repository whose issues are opened by
+  # the person who wrote the code: the friction lands entirely on the one contributor a
+  # form's structure was never meant to discipline, and a required "steps to reproduce"
+  # textarea is not what makes a one-line note about a chart axis easier to file. Issues stay
+  # enabled and free-form. Recorded here rather than simply deleted, because a deletion alone
+  # is undone by the next sync.
+  - .github/ISSUE_TEMPLATE
