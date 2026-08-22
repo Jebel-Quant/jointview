@@ -128,11 +128,9 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. Eleven entries stand: `docs/development/`,
+a directory entry covering everything beneath it. Eight entries stand: `docs/development/`,
 where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
-dropped in favour of the `pytest-rhiza` plugin; `.rhiza/make.d/` with `.rhiza/rhiza.mk`,
-dropped in favour of `rhiza-task`; `.rhiza/.env` with `.rhiza/.gitignore`, dropped once
-`[tool.rhiza-task]` held the only setting either of them still carried; `.github/CONFIG.md`,
+dropped in favour of the `pytest-rhiza` plugin; `.github/CONFIG.md`,
 a walkthrough for configuring `PAT_TOKEN` and the release secrets in the GitHub UI, which
 belongs to whoever set the repo up rather than to anyone reading the tree — and whose
 central subject, a stored PyPI credential, does not apply to a repo publishing by Trusted
@@ -150,12 +148,25 @@ lands entirely on the one contributor a form's structure was never meant to disc
 Issues stay enabled and free-form. And `.github/workflows/rhiza_release.yml`, which is kept
 rather than dropped — the exclusion protects a local edit to a synced file instead of
 refusing the file. In every other case the exclusion, not the deletion, is what makes the
-refusal stick — which is why the make entries stay after the files themselves are gone from
-the tree.
+refusal stick.
 
-`.github/DISCUSSION_TEMPLATE/` is the one that survived the same question, and only just:
-its three forms are inert here because Discussions is switched off on the repository, so
-they cost nothing and are already configured if it is ever switched on.
+**Four entries have retired, and their absence is not a relapse.** `.rhiza/make.d/` with
+`.rhiza/rhiza.mk`, and `.rhiza/.env` with `.rhiza/.gitignore`, were excluded while the
+template still shipped them; the make layer's retirement upstream and the move of
+`RHIZA_CI_OS_MATRIX` into `[tool.rhiza-task]` took the files out of the template itself, so
+#68 dropped the four entries as obsolete. An exclusion is only load-bearing against a path
+the template still delivers.
+
+`.github/DISCUSSION_TEMPLATE/` used to be the one that survived the same question, on the
+grounds that its three forms were inert while Discussions is switched off and would already
+be configured if it were ever switched on. It no longer survives it — the same judgement as
+the issue forms now applies to them, and the exclusion is what carries it.
+
+**That entry is the trap above, sprung, and worth reading as such.** #56 deleted the
+directory and nothing recorded the refusal, so the v1.4.2 sync in #67 wrote all three files
+back. v1.5.0 happens to drop them from the template, which is why the v1.5.0 sync deleted
+them again — but that is upstream's decision to revisit, not this repo's to rely on, so the
+`exclude:` entry went in alongside the deletion — the eighth.
 
 **One bridge is left, and it is temporary.** The reusable workflows call `make`, which is
 why the shim exists at all, but `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no
