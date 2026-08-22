@@ -4,9 +4,18 @@ ref: "v1.5.0"
 profiles:
   - github-project
 
+templates:
+  # SECURITY.md, CODE_OF_CONDUCT.md and CONTRIBUTING.md. LICENSE is excluded below.
+  - legal
+
 # Destination paths the sync must not deliver. A directory entry covers everything
 # under it.
 exclude:
+  # The template's LICENSE. `legal` is synced for SECURITY.md and the community docs,
+  # but the licence text is this repository's own: the bundle ships MIT under
+  # "Copyright (c) 2025 Jebel Quant Research", which is not this repo's holder.
+  - LICENSE
+
   # The template's MARIMO.md and TESTS.md, dropped in #24 along with their mkdocs nav
   # entries: this repo documents both subjects in CLAUDE.md and README.md instead, and
   # a page mkdocs does not link to is a page nobody reads. Recorded here rather than
