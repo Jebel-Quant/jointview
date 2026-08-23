@@ -341,10 +341,53 @@ def _thin(frame: pl.DataFrame, max_points: int) -> pl.DataFrame:
     A line is a shape, not a scatter: dropping intermediate points leaves the shape
     intact, and it is the browser rather than the reader that notices the difference.
     """
-    if frame.height <= max_points or max_points < 2:
+    stride = _stride(frame.height, max_points)
+    if stride == 1:
         return frame
 
-    # Counting gaps rather than rows: keeping the last point costs one of the budget.
-    stride = -(-(frame.height - 1) // (max_points - 1))
     index = pl.int_range(pl.len())
     return frame.filter((index % stride == 0) | (index == frame.height - 1))
+
+
+def _stride(height: int, max_points: int) -> int:
+    """Take every k-th row of ``height`` to fit inside ``max_points``. 1 draws them all.
+
+    Counting gaps rather than rows, and rounding up: keeping the last point costs one of
+    the budget, and rounding down would spend one more than there is.
+    """
+    if height <= max_points or max_points < 2:
+        return 1
+    return -(-(height - 1) // (max_points - 1))
+
+
+def drawn_points(height: int, max_points: int = MAX_POINTS) -> int:
+    """How many points a curve of ``height`` rows is actually drawn with.
+
+    The caption beside the chart needs this and the chart itself does not, which is why
+    it is a function of the row count rather than of a frame: the answer is arithmetic on
+    a height, and asking it should not cost a second pass over the data.
+
+    Short of the cap every row is drawn:
+
+    >>> drawn_points(1_500)
+    1500
+
+    Past it the curve is thinned, and the two numbers stop agreeing — which is the whole
+    reason to be able to ask:
+
+    >>> drawn_points(20_000)
+    3335
+
+    That is fewer than the 4,000 allowed, and it is the rounding rather than a defect. A
+    uniform stride can only divide 19,999 gaps into 6s or 5s; 5s would draw 4,001 points
+    and break the cap the browser is being protected by. Spacing them unevenly would hit
+    the budget exactly, at the price of a line whose gaps are not equal — the shape it
+    exists to preserve is worth more than the 665 points.
+    """
+    stride = _stride(height, max_points)
+    if stride == 1:
+        return height
+
+    last = height - 1
+    # The strided rows, plus the last one where the stride does not already land on it.
+    return last // stride + 1 + (last % stride != 0)

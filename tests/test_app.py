@@ -15,6 +15,7 @@ import pytest
 
 from jointview import cli
 from jointview.app import app
+from jointview.plot import MAX_POINTS, drawn_points
 
 
 @pytest.fixture(scope="module")
@@ -69,6 +70,40 @@ def test_a_panel_says_so_when_there_is_too_little_to_summarise(notebook):
     _, defs = notebook
     lonely = pl.DataFrame({"period": [0], "a": [100.0]})
     assert "too few" in defs["summary_table"](lonely, "a", "tech_fund").text
+
+
+def test_the_caption_says_the_tables_describe_the_lines(notebook):
+    """Below the thinning cap the two numbers are one number, and the caption says so."""
+    _, defs = notebook
+    text = defs["caption"]("cash", "balanced", defs["frame"], defs["pair"]).text
+    assert "1,500 dates where both series are present" in text
+    assert "which is also what the tables summarise" in text
+
+
+def test_the_caption_counts_the_dates_it_dropped(notebook):
+    """A pair that does not span the frame is reported as a sample of it, not as all."""
+    _, defs = notebook
+    frame = defs["frame"]
+    text = defs["caption"]("cash", "balanced", frame, defs["pair"].head(900)).text
+    assert f"900 of {frame.height:,} dates" in text
+
+
+def test_the_caption_does_not_call_a_thinned_curve_the_whole_sample(notebook):
+    """Past the cap the chart draws fewer points than the tables summarise (#75).
+
+    The caption used to quote the aligned height for both, so a 20,000-date parquet was
+    described as 20,000 dates under a line of 3,335 points — and the max drawdown in the
+    table beside it could sit at a date the line no longer carried a point for.
+    """
+    _, defs = notebook
+    rows = MAX_POINTS * 5
+    big = pl.DataFrame({"period": range(rows), "a": [1.0] * rows, "b": [2.0] * rows})
+
+    text = defs["caption"]("tech_fund", "bond_fund", big, big).text
+
+    assert f"{drawn_points(rows):,} points drawn from {rows:,} dates" in text
+    assert f"the tables summarise all {rows:,}" in text
+    assert drawn_points(rows) < rows
 
 
 def test_running_the_file_directly_starts_the_app():
