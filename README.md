@@ -64,6 +64,9 @@ pieces, install the package from [PyPI](https://pypi.org/project/jointview/):
 uv add jointview      # or: pip install jointview
 ```
 
+The package ships a `py.typed` marker, so the annotations on everything below reach your
+own type checker instead of resolving to `Any`.
+
 Statistics come from [jQuantStats](https://github.com/jebel-quant/jquantstats), so the
 frame carries its period column into `summary` — the annualisation factor is read from
 the spacing of the observations rather than assumed.
