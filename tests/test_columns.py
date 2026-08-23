@@ -5,6 +5,8 @@ cutting the two columns down to the rows they share. What the drawing half then 
 of that frame is in :mod:`tests.test_plot`.
 """
 
+import datetime as dt
+
 import polars as pl
 import pytest
 
@@ -30,7 +32,7 @@ def test_series_columns_are_the_numeric_ones():
     assert series_columns(frame) == frame.columns[1:]
 
 
-def test_date_column_is_the_first_temporal_one():
+def test_date_column_is_the_first_date_like_one():
     """The x-axis is found by dtype, not by being called "date"."""
     assert date_column(demo_frame(rows=10)) == "date"
 
@@ -38,6 +40,56 @@ def test_date_column_is_the_first_temporal_one():
 def test_date_column_is_none_without_one():
     """No temporal column is a legitimate frame, not an error — the rows get numbered."""
     assert date_column(pl.DataFrame({"a": [1.0]})) is None
+
+
+def test_date_column_takes_every_flavour_of_datetime():
+    """A time unit and a time zone are not a different kind of axis."""
+    stamps = [dt.datetime(2024, 1, 1, tzinfo=dt.UTC)]
+    for dtype in (pl.Datetime("us"), pl.Datetime("ns"), pl.Datetime("ms", "Europe/Zurich")):
+        frame = pl.DataFrame({"when": stamps}, schema={"when": dtype}).with_columns(nav=pl.lit(1.0))
+        assert date_column(frame) == "when", dtype
+
+
+@pytest.mark.parametrize(
+    "quantity",
+    [
+        pytest.param(dt.timedelta(days=1), id="duration"),
+        pytest.param(dt.time(9, 30), id="time"),
+    ],
+)
+def test_date_column_does_not_mistake_a_temporal_quantity_for_the_axis(quantity):
+    """A holding period or a time of day is temporal, and is still not a date (#74).
+
+    `dtype.is_temporal()` is true of `Duration` and `Time` as well, so a frame carrying
+    one of them *before* its dates used to have that taken as the period axis. Nothing
+    failed: `stats` reads the annualisation factor off the spacing of whatever `aligned`
+    wrote, and a column of timedeltas answered with a CAGR of about 2.5 trillion percent.
+    """
+    frame = pl.DataFrame(
+        {
+            "quantity": [quantity, quantity],
+            "date": [dt.date(2024, 1, 1), dt.date(2024, 1, 2)],
+            "nav": [1.0, 1.1],
+        }
+    )
+    assert date_column(frame) == "date"
+
+
+def test_a_temporal_quantity_does_not_reach_the_period_column():
+    """The consequence of the above, one layer up: `aligned` writes the dates.
+
+    `date_column` is not read for its own sake — what it returns becomes `PERIOD`, and
+    `PERIOD` is what the statistics are annualised from. This is the assertion that would
+    have caught #74 from the outside.
+    """
+    frame = pl.DataFrame(
+        {
+            "held": [dt.timedelta(days=i) for i in range(3)],
+            "date": [dt.date(2024, 1, 1 + i) for i in range(3)],
+            "nav": [1.0, 1.1, 1.2],
+        }
+    )
+    assert aligned(frame, "nav", "nav")[PERIOD].dtype == pl.Date
 
 
 def test_default_pair_opens_on_the_first_two_series():

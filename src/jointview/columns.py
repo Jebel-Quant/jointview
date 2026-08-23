@@ -29,16 +29,35 @@ def series_columns(frame: pl.DataFrame) -> list[str]:
     return [name for name, dtype in frame.schema.items() if dtype.is_numeric()]
 
 
+# Dates and datetimes, and deliberately not everything `dtype.is_temporal()` admits:
+# that predicate is also true of `Time` and `Duration`. A holding period or a time of day
+# is a temporal *quantity*, not a point on a calendar, and it cannot be the axis these
+# series are observed along — `aligned` writes whatever this returns under `PERIOD`, and
+# `stats` reads the annualisation factor off its spacing, so a column of timedeltas
+# arriving here is answered with a CAGR in the trillions rather than an error (#74).
+#
+# Compared with `==` rather than `isinstance`, which is what polars documents for asking
+# after a base type: `pl.Datetime` matches every time unit and time zone, so a
+# `Datetime("ns", "Europe/Zurich")` is admitted without any of that being spelled here.
+_DATE_LIKE = (pl.Date, pl.Datetime)
+
+
 def date_column(frame: pl.DataFrame) -> str | None:
-    """The first temporal column, which becomes the x-axis. None means row number.
+    """The first date or datetime column, which becomes the x-axis. None means row number.
 
     >>> import datetime as dt, polars as pl
     >>> date_column(pl.DataFrame({"when": [dt.date(2024, 1, 1)], "nav": [1.0]}))
     'when'
     >>> date_column(pl.DataFrame({"nav": [1.0]})) is None
     True
+
+    A `Time` or `Duration` column is temporal but is not a date, and does not become the
+    axis — the rows get numbered instead, which is the documented fallback:
+
+    >>> date_column(pl.DataFrame({"held": [dt.timedelta(days=1)], "nav": [1.0]})) is None
+    True
     """
-    return next((name for name, dtype in frame.schema.items() if dtype.is_temporal()), None)
+    return next((name for name, dtype in frame.schema.items() if dtype in _DATE_LIKE), None)
 
 
 def default_pair(frame: pl.DataFrame) -> tuple[int, int]:

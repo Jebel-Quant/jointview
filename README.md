@@ -52,7 +52,7 @@ levels already share a scale.
 | `--edit` | open the notebook itself, from a clone |
 | `-- …` | everything after a bare `--` goes to marimo: `-- --port 8080 --headless` |
 
-The first temporal column becomes the x-axis; without one the rows are numbered. Every
+The first date column becomes the x-axis; without one the rows are numbered. Every
 numeric column is offered as a series.
 
 ## The pieces on their own
