@@ -2,7 +2,7 @@
 
 from jointview.columns import PERIOD, aligned, date_column, default_pair, series_columns
 from jointview.data import demo_frame, load_frame
-from jointview.plot import line_chart, line_frame
+from jointview.plot import drawn_points, line_chart, line_frame
 from jointview.stats import drawdown, metrics, returns, summary, summary_markdown
 
 __all__ = [
@@ -15,6 +15,10 @@ __all__ = [
     "default_pair",
     "demo_frame",
     "drawdown",
+    # What the chart actually draws, which past MAX_POINTS is not what it was given.
+    # Exported for the same reason PERIOD is: the caption beside the plot has to say
+    # which of the two numbers it is quoting, and so does anyone else drawing this frame.
+    "drawn_points",
     "line_chart",
     "line_frame",
     "load_frame",

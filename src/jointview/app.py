@@ -71,7 +71,7 @@ def _(mo):
     """Load the frame, and settle the two things the command line gets a say in."""
     from jointview.columns import aligned, default_pair, series_columns
     from jointview.data import load_frame
-    from jointview.plot import line_chart
+    from jointview.plot import drawn_points, line_chart
     from jointview.stats import summary_markdown
 
     # jointview navs.parquet --height 900
@@ -84,6 +84,7 @@ def _(mo):
     return (
         aligned,
         default_pair,
+        drawn_points,
         frame,
         line_chart,
         names,
@@ -139,8 +140,8 @@ def _(a_pick, aligned, b_pick, frame, line_chart, plot_height, rebase):
 
 
 @app.cell
-def _(mo, summary_markdown):
-    """The two pieces of furniture a side panel is made of."""
+def _(drawn_points, mo, summary_markdown):
+    """The furniture the page is assembled from: the panel pieces, and the caption."""
 
     def summary_table(pair, side, title):
         """A metric table for one side of ``pair``, or a note when the sample is too short.
@@ -168,23 +169,36 @@ def _(mo, summary_markdown):
             gap=0.5,
         )
 
-    return panel, summary_table  # pragma: no cover
+    def caption(a_column, b_column, frame, pair):
+        """One line under the plot saying what it is of, and what the tables describe.
+
+        Two numbers, and past `plot.MAX_POINTS` they differ: the curve is thinned for the
+        browser's sake while the tables go on describing every date in the common sample.
+        Saying so is what keeps this a caption rather than a claim — a max drawdown in a
+        table can sit at a date the line no longer carries a point for.
+        """
+        dropped = frame.height - pair.height
+        note = f" of {frame.height:,}" if dropped else ""
+        sample = f"{pair.height:,}{note} dates where both series are present"
+        drawn = drawn_points(pair.height)
+        body = (
+            f"{drawn:,} points drawn from {sample}; the tables summarise all {pair.height:,}"
+            if drawn < pair.height
+            else f"{sample}, which is also what the tables summarise"
+        )
+        # The multiplication sign is the character this means; a lowercase x beside two
+        # column names reads as part of one of them.
+        return mo.md(f"`{a_column}` × `{b_column}` — {body}.")  # noqa: RUF001
+
+    return caption, panel, summary_table  # pragma: no cover
 
 
 @app.cell
-def _(a_column, b_column, chart, frame, mo, pair, rebase):
+def _(a_column, b_column, caption, chart, frame, mo, pair, rebase):
     """The middle column: the switch, the chart, and a line saying what it is of."""
-    _dropped = frame.height - pair.height
-    _note = f" of {frame.height:,}" if _dropped else ""
-    caption = mo.md(
-        # The multiplication sign is the character this means; a lowercase x beside two
-        # column names reads as part of one of them.
-        f"`{a_column}` × `{b_column}` — {pair.height:,}{_note} dates where both series "  # noqa: RUF001
-        "are present, which is also what the tables summarise."
-    )
     # No align= here: centring would shrink the stack to its content and hand the chart
     # back the gutter that "container" is there to fill.
-    figure = mo.vstack([rebase, chart, caption], gap=0.25)
+    figure = mo.vstack([rebase, chart, caption(a_column, b_column, frame, pair)], gap=0.25)
     return (figure,)
 
 

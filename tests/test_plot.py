@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 
 from jointview.data import demo_frame
-from jointview.plot import SERIES, line_chart, line_frame
+from jointview.plot import MAX_POINTS, SERIES, drawn_points, line_chart, line_frame
 
 
 @pytest.fixture(scope="module")
@@ -107,6 +107,34 @@ def test_line_frame_thins_a_long_curve_but_keeps_the_end(frame):
     assert drawn.height <= 50
     assert drawn["period"][-1] == full["period"][-1]
     assert drawn["cash"][-1] == pytest.approx(full["cash"][-1])
+
+
+@pytest.mark.parametrize("height", [0, 1, 2, 49, 50, 51, 99, 100, 101, 999, 20_000])
+def test_drawn_points_agrees_with_what_is_actually_drawn(height):
+    """The caption's number has to be the chart's number, or it is worse than none (#75).
+
+    `drawn_points` is arithmetic on a row count and `_thin` is a filter over a frame, so
+    nothing but a test keeps the two in step. Sizes either side of the cap, because that
+    is where the stride changes.
+    """
+    # Typed explicitly: a zero-row column built from an empty list is `Null`, which
+    # `aligned` refuses — rightly, and not what this is testing.
+    levels = [float(index + 1) for index in range(height)]
+    nav = pl.DataFrame({"nav": pl.Series(levels, dtype=pl.Float64)})
+    drawn = line_frame(nav, "nav", "nav", rebase=False, max_points=50)
+    assert drawn.height == drawn_points(height, 50)
+
+
+@pytest.mark.parametrize("height", [0, 51, 999, 20_000])
+def test_drawn_points_respects_the_budget_it_was_given(height):
+    """Under the cap, always — it is a limit on what the browser is asked to draw."""
+    assert drawn_points(height, 50) <= 50
+
+
+def test_drawn_points_thins_nothing_up_to_the_cap():
+    """The cap is inclusive: 4,000 points are drawn, 4,001 are thinned."""
+    assert drawn_points(MAX_POINTS) == MAX_POINTS
+    assert drawn_points(MAX_POINTS + 1) < MAX_POINTS + 1
 
 
 def test_line_chart_compiles_with_every_layer(frame):
