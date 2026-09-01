@@ -35,6 +35,11 @@ Pick a series on each side. Both are drawn on one pair of axes, and each summary
 describes exactly the rows in the plot — the *common sample*, where both series are
 present.
 
+The row above the plot cuts that sample down: `all`, `ytd`, `12m`, `36m`, one at a time.
+The windows are measured back from the last date in the file rather than from today, so a
+file that ends last June still has a year to date. The tables follow the cut, and so does
+the indexing — 100 lands at the start of the window.
+
 ## Why both lines share an axis
 
 A second scale would invent a relationship that is not in the data. So both series are

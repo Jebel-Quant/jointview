@@ -11,7 +11,16 @@ import polars as pl
 import pytest
 
 import jointview
-from jointview.columns import PERIOD, aligned, date_column, default_pair, series_columns
+from jointview.columns import (
+    PERIOD,
+    WINDOW_ALL,
+    WINDOWS,
+    aligned,
+    date_column,
+    default_pair,
+    series_columns,
+    windowed,
+)
 from jointview.data import demo_frame
 
 
@@ -90,6 +99,91 @@ def test_a_temporal_quantity_does_not_reach_the_period_column():
         }
     )
     assert aligned(frame, "nav", "nav")[PERIOD].dtype == pl.Date
+
+
+def test_the_windows_are_on_the_public_surface():
+    """`windowed` is exported, so the keys it accepts have to be too.
+
+    The picker's chips and the caption's names are the same four strings; a caller cutting
+    a frame the way the app does should not have to guess them from a screenshot.
+    """
+    assert jointview.WINDOWS is WINDOWS
+    assert jointview.WINDOW_ALL == WINDOW_ALL
+    assert {"WINDOWS", "WINDOW_ALL", "windowed"} <= set(jointview.__all__)
+
+
+def test_the_whole_sample_is_the_first_window():
+    """The default has to be the option nobody had to choose, and it has to cut nothing."""
+    assert next(iter(WINDOWS)) == WINDOW_ALL
+    assert WINDOWS[WINDOW_ALL] is None
+    frame = demo_frame(rows=10)
+    assert windowed(frame, WINDOW_ALL).height == frame.height
+    assert windowed(frame).height == frame.height
+
+
+@pytest.mark.parametrize(
+    ("key", "first"),
+    [
+        pytest.param("ytd", dt.date(2024, 1, 1), id="ytd"),
+        pytest.param("12m", dt.date(2023, 6, 28), id="12m"),
+        pytest.param("36m", dt.date(2021, 6, 28), id="36m"),
+    ],
+)
+def test_each_window_starts_where_it_says(key, first):
+    """Counted back from the last date in the frame, and inclusive of the boundary.
+
+    Daily dates over four years, so the first row each window keeps is the boundary date
+    itself: the year's turn for the year to date, and the same day of the month one, three
+    years earlier for the other two.
+    """
+    end = dt.date(2024, 6, 28)
+    days = [end - dt.timedelta(days=i) for i in reversed(range(4 * 365))]
+    frame = pl.DataFrame({"date": days, "nav": [float(i) for i in range(len(days))]})
+
+    cut = windowed(frame, key)
+
+    assert cut["date"][0] == first
+    assert cut["date"][-1] == end
+
+
+def test_a_window_is_measured_from_the_data_rather_than_from_today():
+    """A file that ends last year still has a year to date — its own, not the clock's."""
+    frame = pl.DataFrame(
+        {
+            "date": [dt.date(2019, 12, 31), dt.date(2020, 3, 31), dt.date(2020, 6, 30)],
+            "nav": [100.0, 90.0, 110.0],
+        }
+    )
+    assert windowed(frame, "ytd")["date"].to_list() == [dt.date(2020, 3, 31), dt.date(2020, 6, 30)]
+
+
+def test_a_window_needs_a_date_to_cut_against():
+    """A frame numbered by row is not cut at all, which is why the app hides the chips."""
+    frame = pl.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    assert windowed(frame, "12m").height == 2
+
+
+def test_a_window_survives_an_empty_frame():
+    """Nothing to cut, and no last period to measure back from, is still an answer."""
+    frame = pl.DataFrame(schema={"date": pl.Date, "nav": pl.Float64})
+    assert windowed(frame, "ytd").is_empty()
+
+
+def test_a_window_takes_the_dates_it_is_given_unsorted():
+    """`aligned` sorts afterwards, so the cut reads the last period rather than the last row."""
+    frame = pl.DataFrame(
+        {
+            "date": [dt.date(2024, 6, 30), dt.date(2020, 1, 1), dt.date(2024, 1, 2)],
+            "nav": [3.0, 1.0, 2.0],
+        }
+    )
+    assert sorted(windowed(frame, "ytd")["date"].to_list()) == [dt.date(2024, 1, 2), dt.date(2024, 6, 30)]
+
+
+def test_an_unknown_window_is_a_mistake_rather_than_the_whole_sample():
+    """Silently drawing everything would hide a typo behind a plausible picture."""
+    with pytest.raises(KeyError):
+        windowed(demo_frame(rows=10), "6m")
 
 
 def test_default_pair_opens_on_the_first_two_series():

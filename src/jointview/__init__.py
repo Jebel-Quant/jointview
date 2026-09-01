@@ -1,6 +1,15 @@
 """Compare two price or NAV series of a Polars DataFrame side by side."""
 
-from jointview.columns import PERIOD, aligned, date_column, default_pair, series_columns
+from jointview.columns import (
+    PERIOD,
+    WINDOW_ALL,
+    WINDOWS,
+    aligned,
+    date_column,
+    default_pair,
+    series_columns,
+    windowed,
+)
 from jointview.data import demo_frame, load_frame
 from jointview.plot import drawn_points, line_chart, line_frame
 from jointview.stats import drawdown, metrics, returns, summary, summary_markdown
@@ -10,6 +19,11 @@ __all__ = [
     # of. Exported because `aligned` is: a caller who has the frame but not the name
     # has to spell "period" by hand, which is the literal `columns` exists to hold.
     "PERIOD",
+    # The windows the app offers over the plot, and the key that means "no cut". A caller
+    # cutting a frame the way the app does needs the same names the picker shows, and the
+    # one that stands for the whole sample is worth not spelling twice.
+    "WINDOWS",
+    "WINDOW_ALL",
     "aligned",
     "date_column",
     "default_pair",
@@ -27,4 +41,5 @@ __all__ = [
     "series_columns",
     "summary",
     "summary_markdown",
+    "windowed",
 ]

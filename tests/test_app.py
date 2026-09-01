@@ -15,6 +15,7 @@ import pytest
 
 from jointview import cli
 from jointview.app import app
+from jointview.columns import WINDOW_ALL, WINDOWS
 from jointview.plot import MAX_POINTS, drawn_points
 
 
@@ -46,6 +47,46 @@ def test_the_pair_it_summarises_is_the_pair_it_draws(notebook):
     assert isinstance(pair, pl.DataFrame)
     assert pair.columns == ["period", "a", "b"]
     assert pair.height == defs["frame"].height
+
+
+def test_the_window_row_offers_every_window_and_opens_on_the_whole_sample(notebook):
+    """The chips over the plot are `columns.WINDOWS`, in its order, and none is preselected.
+
+    A dated frame gets all four. The default is the whole sample because it is the only
+    window that is not a choice — a file opens showing what is in it.
+    """
+    _, defs = notebook
+    window = defs["window"]
+    assert list(window.options) == list(WINDOWS)
+    assert window.value == WINDOW_ALL
+
+
+def test_the_window_defaulting_to_all_draws_the_whole_file(notebook):
+    """Nothing is cut until a chip is clicked, so the pair still spans the frame."""
+    _, defs = notebook
+    assert defs["pair"].height == defs["frame"].height
+
+
+def test_the_caption_names_the_window_the_sample_was_cut_to(notebook):
+    """Under a cut the missing dates are a choice, and the caption says which one.
+
+    `frame` in the caption is the whole file whatever is selected, so "90 of 1,500" on its
+    own would read as 1,410 dates where a series was absent rather than as a window.
+    """
+    _, defs = notebook
+    frame = defs["frame"]
+
+    text = defs["caption"]("cash", "balanced", frame, defs["pair"].head(90), "ytd").text
+
+    # Rendered markdown, so the backticks around the window's name have already become
+    # a <code> element by the time the caption is a string.
+    assert f"90 of {frame.height:,} dates inside <code>ytd</code> where both series are present" in text
+
+
+def test_the_caption_has_no_window_to_name_when_nothing_was_cut(notebook):
+    """`all` is the absence of a window, not a window called all, so it is not mentioned."""
+    _, defs = notebook
+    assert "inside" not in defs["caption"]("cash", "balanced", defs["frame"], defs["pair"]).text
 
 
 def test_the_chart_is_a_compiled_layer_chart(notebook):
