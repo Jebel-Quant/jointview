@@ -11,7 +11,13 @@ and ``--height``.
 # away — and the types are marimo's UI plumbing, so the annotations would be `Any`
 # anyway. Told to ruff here rather than in a config file, so the reason sits next to
 # the code it excuses. (ty asks for none of this; it does not require annotations.)
-# ruff: noqa: ANN001, ANN202
+#
+# N803 is there for the same reason. A cell's parameters *are* the names it reads, so a
+# cell reading a module-level constant — `WINDOWS`, `WINDOW_ALL` — takes an upper-case
+# argument. That is marimo spelling a constant's own name back, not an argument named
+# against the convention here, and lower-casing it would mean aliasing the constant to
+# hide the shape of the generated code.
+# ruff: noqa: ANN001, ANN202, N803
 #
 # The `return` closing each cell is marimo's too, and it is why four of them below carry
 # a `# pragma: no cover`. Running the notebook never calls these functions: marimo keeps
@@ -69,7 +75,15 @@ def _(mo) -> None:
 @app.cell
 def _(mo):
     """Load the frame, and settle the two things the command line gets a say in."""
-    from jointview.columns import aligned, default_pair, series_columns
+    from jointview.columns import (
+        WINDOW_ALL,
+        WINDOWS,
+        aligned,
+        date_column,
+        default_pair,
+        series_columns,
+        windowed,
+    )
     from jointview.data import load_frame
     from jointview.plot import drawn_points, line_chart
     from jointview.stats import summary_markdown
@@ -82,7 +96,10 @@ def _(mo):
     # more, and only the person looking at it knows which they have.
     plot_height = int(mo.cli_args().get("height") or 700)
     return (
+        WINDOWS,
+        WINDOW_ALL,
         aligned,
+        date_column,
         default_pair,
         drawn_points,
         frame,
@@ -90,6 +107,7 @@ def _(mo):
         names,
         plot_height,
         summary_markdown,
+        windowed,
     )
 
 
@@ -121,26 +139,43 @@ def _(default_pair, frame, mo, names):
 
 
 @app.cell
-def _(mo):
-    """The only control over the plot itself: whether to index both series to 100."""
+def _(WINDOWS, WINDOW_ALL, date_column, frame, mo):
+    """The two controls over the plot: how much of the sample to draw, and whether to index."""
     # Two NAVs on one axis only mean something on a shared scale; off, the raw levels
     # are there for a pair that already shares one.
     rebase = mo.ui.switch(value=True, label="index both to 100")
-    return (rebase,)
+
+    # A radio rather than a date-range picker, and one row rather than two boxes: the
+    # questions actually asked of a NAV curve are "this year" and "the last three years",
+    # and a chip answers them in a click. Exclusive by construction, which is what the
+    # sample being one stretch of calendar requires — the whole of it by default, because
+    # a file's own span is the only window nobody has to have chosen.
+    #
+    # Cut by date, so a frame numbered by row has nothing to cut against and is offered
+    # the whole sample alone. Three chips that quietly did nothing would be worse than
+    # their absence.
+    windows = list(WINDOWS) if date_column(frame) else [WINDOW_ALL]
+    window = mo.ui.radio(options=windows, value=WINDOW_ALL, inline=True)
+    return rebase, window
 
 
 @app.cell
-def _(a_pick, aligned, b_pick, frame, line_chart, plot_height, rebase):
-    """Read the pickers, and derive everything the layout below draws."""
+def _(a_pick, aligned, b_pick, frame, line_chart, plot_height, rebase, window, windowed):
+    """Read the controls, and derive everything the layout below draws."""
     a_column = a_pick.value
     b_column = b_pick.value
-    pair = aligned(frame, a_column, b_column)
-    chart = line_chart(frame, a_column, b_column, rebase=rebase.value, height=plot_height)
+    # The window is taken once, here, and both the chart and the tables are built from
+    # what it leaves — which is what keeps the caption's promise under a cut. Rebasing
+    # follows it too: 100 lands at the start of the window, which is the comparison
+    # choosing a window asks for.
+    shown = windowed(frame, window.value)
+    pair = aligned(shown, a_column, b_column)
+    chart = line_chart(shown, a_column, b_column, rebase=rebase.value, height=plot_height)
     return a_column, b_column, chart, pair
 
 
 @app.cell
-def _(drawn_points, mo, summary_markdown):
+def _(WINDOW_ALL, drawn_points, mo, summary_markdown):
     """The furniture the page is assembled from: the panel pieces, and the caption."""
 
     def summary_table(pair, side, title):
@@ -169,17 +204,23 @@ def _(drawn_points, mo, summary_markdown):
             gap=0.5,
         )
 
-    def caption(a_column, b_column, frame, pair):
+    def caption(a_column, b_column, frame, pair, window=WINDOW_ALL):
         """One line under the plot saying what it is of, and what the tables describe.
 
         Two numbers, and past `plot.MAX_POINTS` they differ: the curve is thinned for the
         browser's sake while the tables go on describing every date in the common sample.
         Saying so is what keeps this a caption rather than a claim — a max drawdown in a
         table can sit at a date the line no longer carries a point for.
+
+        The window is named for the same reason. `frame` is the whole file whatever is
+        selected, so under a cut the dates missing from the sample were not dates a series
+        was absent on — they were dates left outside the window, and "252 of 1,500 dates
+        where both series are present" would report a choice as a hole in the data.
         """
         dropped = frame.height - pair.height
         note = f" of {frame.height:,}" if dropped else ""
-        sample = f"{pair.height:,}{note} dates where both series are present"
+        inside = "" if window == WINDOW_ALL else f" inside `{window}`"
+        sample = f"{pair.height:,}{note} dates{inside} where both series are present"
         drawn = drawn_points(pair.height)
         body = (
             f"{drawn:,} points drawn from {sample}; the tables summarise all {pair.height:,}"
@@ -194,11 +235,22 @@ def _(drawn_points, mo, summary_markdown):
 
 
 @app.cell
-def _(a_column, b_column, caption, chart, frame, mo, pair, rebase):
-    """The middle column: the switch, the chart, and a line saying what it is of."""
+def _(a_column, b_column, caption, chart, frame, mo, pair, rebase, window):
+    """The middle column: the controls, the chart, and a line saying what it is of."""
+    # The two controls share one row above the plot: both are about the picture rather
+    # than about either series, and neither is wide enough to spend a line of the page on.
+    # Pushed to the two ends of that row, which is the chart's own width — the windows
+    # under the y-axis on the left, the switch over the end of the lines on the right —
+    # so the row reads as the plot's own frame rather than as a caption above it. Nothing
+    # sits outside those limits: the hstack is the chart's container, so "space-between"
+    # can only reach the edges the picture already occupies.
+    controls = mo.hstack([window, rebase], justify="space-between", align="center", gap=1.5)
     # No align= here: centring would shrink the stack to its content and hand the chart
     # back the gutter that "container" is there to fill.
-    figure = mo.vstack([rebase, chart, caption(a_column, b_column, frame, pair)], gap=0.25)
+    figure = mo.vstack(
+        [controls, chart, caption(a_column, b_column, frame, pair, window.value)],
+        gap=0.25,
+    )
     return (figure,)
 
 

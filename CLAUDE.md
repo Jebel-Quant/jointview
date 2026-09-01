@@ -19,7 +19,7 @@ Source lives in `src/jointview/`, seven modules in three layers:
 
 | Module | Job |
 | --- | --- |
-| `columns.py` | **The shared vocabulary.** `PERIOD`, `series_columns`, `date_column`, `default_pair`, `aligned`. Depends on nothing else in the package. |
+| `columns.py` | **The shared vocabulary.** `PERIOD`, `series_columns`, `date_column`, `default_pair`, `aligned`, and the x-axis windows — `WINDOWS`, `WINDOW_ALL`, `windowed`. Depends on nothing else in the package. |
 | `data.py` | Reading a frame off disk (`load_frame`) and generating one (`demo_frame`). |
 | `plot.py` | Altair chart construction — `line_frame`, `line_chart`, and the private layer helpers. |
 | `stats.py` | Summary statistics via [jQuantStats](https://github.com/jebel-quant/jquantstats). |
@@ -32,6 +32,14 @@ both consume what `aligned()` produces, and neither imports the other. Anything 
 both need — a column name, a shaping rule — belongs in `columns.py`. `PERIOD` is the
 worked example: it is the name `aligned()` writes and the name the statistics read
 back, so it is a data contract, not a plotting detail.
+
+`WINDOWS` is the same rule one layer out. The row of chips above the plot — `all`,
+`ytd`, `12m`, `36m` — looks like a plotting control, and is not: `windowed()` is applied
+to the frame once, in `app.py`, before `aligned()`, so the lines, the two tables and the
+base a rebased pair is indexed to all follow from one cut. Windows are measured back from
+the last period *in the frame* rather than from today, and a frame with no date column is
+not cut at all — which is why the app offers such a frame the whole sample alone rather
+than three chips that would do nothing.
 
 Tests sit flat in `tests/`, one file per module. `tests/test_columns.py` and
 `tests/test_stats.py` between them pin the contract above.

@@ -9,13 +9,40 @@ into the other.
 ``PERIOD`` is the clearest case. It is the name :func:`aligned` writes the x-axis under
 and the name the statistics read it back out of: a data contract between the two, not
 a fact about plotting.
+
+``WINDOWS`` is here for the same reason one layer out. Cutting the sample to the year to
+date is not a fact about the drawing either: the window is taken off the frame once, and
+the lines, the tables and the base a rebased pair is indexed to all follow from that one
+cut instead of each making it themselves.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import polars as pl
 
 PERIOD = "period"
+
+WINDOW_ALL = "all"
+
+# The stretches of the sample the app offers above the plot, in the order it offers them,
+# each mapped to where it begins as a function of the last period in the frame.
+#
+# Measured back from that last period rather than from today: a parquet is as recent as
+# it is, and a window read off the clock would come back empty on a series that ends last
+# year — the same file being informative on Tuesday and blank on Wednesday.
+#
+# `None` is the whole sample. It is not "an offset of zero": it cuts nothing, and it is
+# also how a caller knows there is no cut to mention.
+WINDOWS: dict[str, Callable[[pl.Expr], pl.Expr] | None] = {
+    WINDOW_ALL: None,
+    # The turn of the year is a calendar boundary rather than a duration, which is why
+    # this one truncates where the others count backwards.
+    "ytd": lambda last: last.dt.truncate("1y"),
+    "12m": lambda last: last.dt.offset_by("-12mo"),
+    "36m": lambda last: last.dt.offset_by("-36mo"),
+}
 
 
 def series_columns(frame: pl.DataFrame) -> list[str]:
@@ -58,6 +85,44 @@ def date_column(frame: pl.DataFrame) -> str | None:
     True
     """
     return next((name for name, dtype in frame.schema.items() if dtype in _DATE_LIKE), None)
+
+
+def windowed(frame: pl.DataFrame, key: str = WINDOW_ALL) -> pl.DataFrame:
+    """``frame`` cut to one of :data:`WINDOWS`, measured back from its last period.
+
+    Applied to the frame rather than to the picture, so everything built from it agrees:
+    the lines, the numbers beside them, and the base a rebased pair is indexed to.
+
+    Raises:
+        KeyError: if ``key`` is not one of :data:`WINDOWS`.
+
+    >>> import datetime as dt, polars as pl
+    >>> frame = pl.DataFrame(
+    ...     {
+    ...         "date": [dt.date(2022, 12, 30), dt.date(2023, 12, 29), dt.date(2024, 6, 28)],
+    ...         "nav": [90.0, 100.0, 110.0],
+    ...     }
+    ... )
+    >>> windowed(frame, "ytd")["date"].to_list()
+    [datetime.date(2024, 6, 28)]
+    >>> windowed(frame, "12m").height
+    2
+    >>> windowed(frame, "all").height
+    3
+
+    A window is a stretch of calendar, so a frame numbered by row has nothing to cut
+    against and comes back whole:
+
+    >>> windowed(pl.DataFrame({"nav": [1.0, 2.0]}), "ytd").height
+    2
+    """
+    start = WINDOWS[key]
+    date = date_column(frame)
+    if start is None or date is None:
+        return frame
+    # `max()` rather than the last row: the frame reaching here need not be sorted, and
+    # `aligned` does its own sorting afterwards.
+    return frame.filter(pl.col(date) >= start(pl.col(date).max()))
 
 
 def default_pair(frame: pl.DataFrame) -> tuple[int, int]:
