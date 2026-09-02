@@ -7,8 +7,8 @@ or drawn without opening the GUI at all:
 from jointview import demo_frame, line_chart, summary_markdown
 
 frame = demo_frame()
-chart = line_chart(frame, "world_equity", "tech_fund")               # an Altair LayerChart
-table = summary_markdown(frame, "world_equity", date_col="date")     # a markdown table
+chart = line_chart(frame, "world_equity", "tech_fund")  # an Altair LayerChart
+table = summary_markdown(frame, "world_equity", date_col="date")  # a markdown table
 ```
 
 Note what `summary_markdown` takes: the frame **and** the column name, not a bare

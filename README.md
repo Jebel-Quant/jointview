@@ -81,9 +81,9 @@ from jointview import demo_frame, line_chart, metrics, summary
 
 frame = demo_frame()
 
-table = summary(frame, "balanced", date_col="date")                    # a formatted two-column frame
+table = summary(frame, "balanced", date_col="date")  # a formatted two-column frame
 sharpe = metrics(frame, "tech_fund", date_col="date")["Sharpe ratio"]  # the raw number
-chart = line_chart(frame, "balanced", "tech_fund")                     # a plain Altair chart
+chart = line_chart(frame, "balanced", "tech_fund")  # a plain Altair chart
 
 print(table.columns, table.height, dict(table.iter_rows())["Max drawdown"])
 print(f"{sharpe:.2f}")
