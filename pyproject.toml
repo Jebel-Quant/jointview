@@ -1,6 +1,52 @@
+# hatchling rather than uv_build, for one reason: the version below is derived from the
+# git tag, and uv_build has no VCS version plugin. Under `dynamic = ["version"]` it does
+# not fall back -- it refuses the build outright ("missing field `version`"). hatch-vcs
+# is also what the rest of the fleet uses, so there is one packaging story to know.
+#
+# The built artifacts are unchanged by the switch: same nine modules including py.typed,
+# same entry point, same LICENSE in dist-info/licenses/. Verified by diffing the wheel
+# and sdist listings against the uv_build ones.
 [build-system]
-requires = ["uv_build>=0.12.3,<0.13.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# Supplies the `version` that [project] declares dynamic, from `git describe`. Two
+# consequences worth knowing:
+#   * The build needs the tag to be visible. hatch-vcs does not fail without it -- it
+#     falls back to a dev version like 0.3.4.dev3+g<sha> -- so rhiza_release.yml checks
+#     the built distribution's filename against the tag, and its checkout uses
+#     fetch-depth: 0. An sdist carries the resolved number in PKG-INFO, so building from
+#     one needs no git.
+#   * Between tags the local version is the *next* patch as a dev release
+#     (guess-next-dev, the default), which is why nothing pins a fallback-version here:
+#     a wrong-looking version must surface as a release failure, not as a plausible
+#     constant.
+[tool.hatch.version]
+source = "vcs"
+
+# uv_build inferred the package from the src/ layout; hatchling needs it named.
+[tool.hatch.build.targets.wheel]
+packages = ["src/jointview"]
+
+# Also needed by the switch, and less obvious than the wheel: hatchling's default sdist
+# is everything git tracks, where uv_build shipped only the package plus its metadata.
+# Left at the default, `uv build` would publish the workflows, docs, tests, Makefile and
+# uv.lock to PyPI -- a much larger artifact than any release before it. This keeps the
+# previous contents. PKG-INFO carries the resolved version, so a build from the sdist
+# needs no git history.
+#
+# Note this leaves jointview's sdist deliberately narrower than the fleet's other
+# hatchling repos, whose sdists do ship the whole tracked tree. That is their existing
+# behaviour and not this change's to alter; here the narrow set *is* the existing
+# behaviour. hatchling adds .gitignore regardless of `include`, the one file the
+# uv_build sdist did not carry.
+[tool.hatch.build.targets.sdist]
+include = [
+    "LICENSE",
+    "README.md",
+    "pyproject.toml",
+    "src/jointview",
+]
 
 [project]
 license = "Apache-2.0"
@@ -13,7 +59,10 @@ classifiers = [
 ]
 authors = [{ name = "Thomas Schmelzer", email = "thomas.schmelzer@gmail.com" }]
 name = "jointview"
-version = "0.3.3"
+# Derived from the git tag by hatch-vcs (see [tool.hatch.version]) rather than written
+# here, so the tag is the single source of truth and a release is `git tag` alone -- no
+# bump commit, and no way for a number in this file to disagree with what was tagged.
+dynamic = ["version"]
 description = "A small marimo GUI for comparing two price or NAV series of a Polars DataFrame."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -63,14 +112,14 @@ reason = "tests sit flat in tests/, one file per module, rather than mirroring t
 Homepage = "https://github.com/Jebel-Quant/jointview"
 Repository = "https://github.com/Jebel-Quant/jointview"
 
+# No current_version, and no [[tool.bumpversion.files]] entry for pyproject.toml:
+# [project].version is dynamic, derived from the git tag, so there is no number in any
+# file for a bump to rewrite. bump-my-version resolves the current version from the
+# newest reachable tag instead -- the same answer hatch-vcs gives -- so it still
+# proposes the right next number. Re-adding either would break rather than no-op: a
+# stale current_version drifts silently, and a `search` pattern that occurs zero times
+# is an error to bump-my-version and to the check-bumpversion-config hook.
 [tool.bumpversion]
-current_version = "0.3.3"
 tag = false
 commit = false
 allow_dirty = false
-
-[[tool.bumpversion.files]]
-filename = "pyproject.toml"
-regex = true
-search = '(?ms)^\[project\]((?:(?!^\[)[\s\S])*?)^version = "{current_version}"'
-replace = '[project]\1version = "{new_version}"'
