@@ -15,7 +15,7 @@ axis.
 
 ## Layout
 
-Source lives in `src/jointview/`, seven modules in three layers:
+Source lives in `src/jointview/`, eight modules in three layers:
 
 | Module | Job |
 | --- | --- |
@@ -26,6 +26,10 @@ Source lives in `src/jointview/`, seven modules in three layers:
 | `app.py` | The marimo notebook. Cells are marimo-generated; it rewrites them on save. |
 | `cli.py` | The `jointview` command — builds an argv and hands it to `marimo run`. |
 | `__init__.py` | The public surface, with an explicit `__all__`. |
+| `__main__.py` | `python -m jointview` — imports `cli.main` behind a `__name__` guard, so walking the package does not launch a server. Covered by `tests/test_cli.py`. |
+
+`src/jointview/py.typed` sits alongside them: the marker that makes the annotations
+count downstream, and `tests/test_packaging.py` asserts the wheel carries it.
 
 **The dependency direction is the thing to preserve.** `plot` and `stats` are peers:
 both consume what `aligned()` produces, and neither imports the other. Anything they
@@ -109,7 +113,7 @@ the root `.gitignore`, and with no `.env` there is nothing to un-ignore.
 ## What this repo owns, and what it does not
 
 This is a [rhiza](https://github.com/jebel-quant/rhiza)-managed repo, synced from
-template **v1.4.2**. `.rhiza/template.lock` lists every synced path; the `files:` block
+template **v1.8.0**. `.rhiza/template.lock` lists every synced path; the `files:` block
 is generated, so treat it as the authority rather than this table.
 
 **Template-owned — do not edit here.** Changes are made upstream at `jebel-quant/rhiza`
@@ -117,17 +121,16 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 - `.rhiza/` in its entirety — except `.rhiza/template.yml`, the repo's own pointer at the
   template and the one file the sync will never overwrite
-- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.4.2`,
-  all of them: `rhiza_ci.yml` had been pinned ahead at `@v1.3.4` for the
-  `generate-matrix` reason below, and v1.4.2 levelled it with the rest. A `/rhiza:update`
-  moves the refs and `.rhiza/template.lock` together.
+- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.8.0`,
+  all of them, on one ref. A `/rhiza:update` moves the refs and `.rhiza/template.lock`
+  together.
   **`rhiza_release.yml` is the exception and is now repo-owned**: it is synced whole
   rather than delegating, because the PyPI publish has to run under this repository's
   identity for Trusted Publishing. Its conda and devcontainer jobs were removed — no
   `.devcontainer` here, no feedstock waiting on a grayskull recipe — and an `exclude:`
   entry is what keeps them removed. The price is that upstream fixes to the release
   pipeline no longer arrive; check the template's copy by hand when one lands.
-- `.pre-commit-config.yaml`, `pytest.ini`, `ruff.toml`
+- `Makefile`, `.pre-commit-config.yaml`, `pytest.ini`, `ruff.toml`
 - `docs/mkdocs-base.yml`, `docs/index.md`
 
 **Repo-owned — edit freely.** `src/`, `tests/`, `pyproject.toml`, `README.md`,
@@ -136,45 +139,39 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 **Declining a synced file takes more than deleting it** — the next sync writes it back.
 `exclude:` in `.rhiza/template.yml` is what makes a refusal stick, in destination paths,
-a directory entry covering everything beneath it. Eight entries stand: `docs/development/`,
-where the template's `MARIMO.md` and `TESTS.md` were dropped in #24; `.rhiza/tests/`,
-dropped in favour of the `pytest-rhiza` plugin; `.github/CONFIG.md`,
-a walkthrough for configuring `PAT_TOKEN` and the release secrets in the GitHub UI, which
-belongs to whoever set the repo up rather than to anyone reading the tree — and whose
-central subject, a stored PyPI credential, does not apply to a repo publishing by Trusted
-Publishing; `.github/workflows/rhiza_fuzzing.yml` with `.github/workflows/rhiza_mutation.yml`,
-the two opt-in workflows v1.4.2 added, both off unless a repository variable turns them on and
-neither turned on here — there is no parser and no untrusted input in a marimo app over two
-Polars columns for a fuzzer to reach, and the assertion-strength question mutation testing
-asks is one that 100% line coverage over seven small modules already answers cheaply. Their
-gates sit in different places, which is why declining both is one decision rather than two:
-mutation's `if:` is in the stub, so the job never starts, while fuzzing's is inside the
-reusable workflow, so the job does start on every pull request in order to skip. Then
-`.github/ISSUE_TEMPLATE/`, the two issue forms — 98 lines of required fields, for a
-repository whose issues are opened by the person who wrote the code, where the friction
-lands entirely on the one contributor a form's structure was never meant to discipline.
-Issues stay enabled and free-form. And `.github/workflows/rhiza_release.yml`, which is kept
+a directory entry covering everything beneath it. **Five entries stand**, and the
+load-bearing one is first: `LICENSE`, because the `legal` bundle ships MIT under
+"Copyright (c) 2025 Jebel Quant Research" and this repo is Apache-2.0 — the bundle is
+synced for `SECURITY.md` and the community docs, and the licence text is its own. Then
+`docs/development/`, where the template's `MARIMO.md` and `TESTS.md` were dropped in #24,
+since both subjects are documented here and in `README.md` and a page mkdocs does not
+link to is a page nobody reads; `.rhiza/tests/`, dropped in favour of the `pytest-rhiza`
+plugin, which arrives installed and pinned from `[tool.rhiza-task]` rather than as a
+second, older copy in the tree; `.github/workflows/rhiza_release.yml`, which is kept
 rather than dropped — the exclusion protects a local edit to a synced file instead of
-refusing the file. In every other case the exclusion, not the deletion, is what makes the
-refusal stick.
+refusing the file; and `.github/CONFIG.md`, a walkthrough for configuring `PAT_TOKEN` and
+the release secrets in the GitHub UI, which belongs to whoever set the repo up rather
+than to anyone reading the tree — and whose central subject, a stored PyPI credential,
+does not apply to a repo publishing by Trusted Publishing. In every case but the release
+workflow the exclusion, not the deletion, is what makes the refusal stick.
 
-**Four entries have retired, and their absence is not a relapse.** `.rhiza/make.d/` with
+**Entries have retired, and their absence is not a relapse.** `.rhiza/make.d/` with
 `.rhiza/rhiza.mk`, and `.rhiza/.env` with `.rhiza/.gitignore`, were excluded while the
 template still shipped them; the make layer's retirement upstream and the move of
 `RHIZA_CI_OS_MATRIX` into `[tool.rhiza-task]` took the files out of the template itself, so
-#68 dropped the four entries as obsolete. An exclusion is only load-bearing against a path
-the template still delivers.
+#68 dropped the four entries as obsolete. v1.5.0 then did the same to four more:
+`.github/ISSUE_TEMPLATE/` and `.github/DISCUSSION_TEMPLATE/` were dropped from the bundle
+(rhiza #1567, #1566) and #71 dropped their entries; `.github/workflows/rhiza_fuzzing.yml`
+and `.github/workflows/rhiza_mutation.yml` were retired with mutation testing itself
+(rhiza #1568, #1572, #1492) and #73 dropped theirs. **An exclusion is only load-bearing
+against a path the template still delivers**, and one that resolves to nothing is dead
+config reading like an active decision.
 
-`.github/DISCUSSION_TEMPLATE/` used to be the one that survived the same question, on the
-grounds that its three forms were inert while Discussions is switched off and would already
-be configured if it were ever switched on. It no longer survives it — the same judgement as
-the issue forms now applies to them, and the exclusion is what carries it.
-
-**That entry is the trap above, sprung, and worth reading as such.** #56 deleted the
-directory and nothing recorded the refusal, so the v1.4.2 sync in #67 wrote all three files
-back. v1.5.0 happens to drop them from the template, which is why the v1.5.0 sync deleted
-them again — but that is upstream's decision to revisit, not this repo's to rely on, so the
-`exclude:` entry went in alongside the deletion — the eighth.
+**The trap is still worth reading, because this repo sprang it.** #56 deleted
+`.github/DISCUSSION_TEMPLATE/` and nothing recorded the refusal, so the v1.4.2 sync in #67
+wrote all three files back. The entry that followed is gone now only because upstream
+stopped shipping the directory — which is upstream's decision to revisit, not something a
+deletion here would have survived on its own.
 
 **One bridge is left, and it is temporary.** The reusable workflows call `make`, which is
 why the shim exists at all, but `rhiza_ci.yml`'s `pre-commit` job runs `make fmt` with no
@@ -186,41 +183,56 @@ and the bridge goes when that job does.
 **There were two.** `generate-matrix` ran `make -f .rhiza/rhiza.mk -s ci-os-matrix`, which
 made a *path* part of the reusable contract: this repo had to keep four repo-owned lines at
 `.rhiza/rhiza.mk` whose only caller was that step. Since `@v1.3.4` the step installs uv and
-runs `uvx rhiza-task ci-os-matrix` (jebel-quant/rhiza#1546), so the file is gone — deleted
-here, and still excluded in `.rhiza/template.yml` so the sync cannot write the template's
-original back. It asks the CLI for the matrix rather than reading a path, which is also what
-let `.rhiza/.env` go afterwards: the setting stayed put and only its file changed, from
-`RHIZA_CI_OS_MATRIX` there to `ci-os-matrix` in `[tool.rhiza-task]`. That step is also why
-the pin is at `rhiza-task@0.1.2` or later: it exports an
+runs `uvx rhiza-task ci-os-matrix` (jebel-quant/rhiza#1546), so the file is gone — and the
+`exclude:` entry that once guarded it is gone too, retired with the rest when the template
+stopped shipping the make layer. It asks the CLI for the matrix rather than reading a path,
+which is also what let `.rhiza/.env` go afterwards: the setting stayed put and only its file
+changed, from `RHIZA_CI_OS_MATRIX` there to `ci-os-matrix` in `[tool.rhiza-task]`. That step
+is also why the pin has a floor at all — the current pin is `rhiza-task@1.7.0`, far past it.
+It exports an
 intentionally *empty* `RHIZA_CI_OS_MATRIX` for every repo that is not the template's own,
 and 0.1.1 resolved an empty string to a value and answered `[]` — which GitHub expands to
 zero jobs rather than failing (Jebel-Quant/rhiza-task#4).
 
-`Makefile` otherwise holds one variable — the `rhiza-task` version, which is the entire
-version contract — and optionally includes a gitignored `local.mk` last; a repo-specific
-target belongs in either, and an explicit rule in both beats the catch-all.
+`Makefile` otherwise holds one variable — `RHIZA_TASK`, currently `rhiza-task@1.7.0`, which
+is the entire version contract — and optionally includes a gitignored `local.mk` last. **The
+`Makefile` is itself synced now**, from the template's `core` bundle, and its own header says
+so: "Nothing goes below the shim: this file is synced, so the next `/rhiza:update` overwrites
+whatever was appended to it." A repo-specific *target* therefore belongs in `local.mk`, where
+an explicit rule beats the catch-all, and a repo-specific *task* in a `rhiza_task.tasks`
+entry point. Neither belongs in the `Makefile` any more.
 
 ## Releasing
 
 `/rhiza:release`, and it is **two-phase** — the split is forced by squash-merge, since
 a tag must name a commit that actually lands on `main`.
 
-1. **Phase A** — run it on a clean `main`. It bumps the version everywhere
-   `[[tool.bumpversion.files]]` declares, prepends a `git-cliff` changelog section,
-   and opens a release PR. **No tag is created.**
+1. **Phase A** — run it on a clean `main`. It prepends a `git-cliff` changelog section
+   and opens a release PR. **No tag is created**, and no file's version is rewritten —
+   see below.
 2. **Phase B** — run it again after that PR merges. It tags the merged commit and
    pushes, which triggers release CI.
 
-Never hand-edit a version: `bump-my-version` reads `[tool.bumpversion]` in
-`pyproject.toml`, and the `[project]` pattern there is deliberately anchored to that
-table so a dependency sharing the number is not rewritten. A missing location is fixed
-by adding a config entry.
+**Since #91 the version lives in the git tag, and nowhere else.** `[project].version` is
+`dynamic`, derived by hatch-vcs from `git describe` — which is why the build backend is
+hatchling rather than `uv_build`, whose lack of a VCS version plugin turns `dynamic` into a
+refused build. So there is no number in any file to hand-edit and none to bump: the
+`[tool.bumpversion]` table deliberately carries **no `current_version` and no
+`[[tool.bumpversion.files]]` entry**, and `bump-my-version` resolves the current version
+from the newest reachable tag instead — the same answer hatch-vcs gives. Re-adding either
+key would break rather than no-op: a stale `current_version` drifts silently, and a
+`search` pattern matching zero times is an error to `bump-my-version` and to the
+`check-bumpversion-config` hook. Between tags the local version is the next patch as a dev
+release, so a missing tag surfaces as a release failure rather than a plausible number.
 
 Commits are [Conventional Commits](https://www.conventionalcommits.org) — that is what
 the changelog is generated from. Pre-1.0, a breaking change is a legitimate `minor`;
 `v1.0.0` is a separate decision about API stability.
 
-One quirk to expect: between phase A and phase B, `make rhiza-test` fails
-`test_latest_tag_matches_pyproject_version`, because the version has been bumped and
-the tag does not exist yet. That is the release flow working as designed, not a defect.
-No CI job runs `rhiza-test`, so it does not block the PR.
+The quirk this used to warn about is gone with the written version. `make rhiza-test` no
+longer fails `test_latest_tag_matches_pyproject_version` between the two phases — that
+check and five others now **skip**, each reporting "`[project].version` is dynamic — no
+written version to compare against git", so a run reports **29 passed, 6 skipped**. This is
+also why `[tool.rhiza-task]` pins `pytest-rhiza` to an exact version rather than a floor:
+0.6.0 is the first release that skips those assertions instead of reading `[project].version`
+as the empty string and failing.
