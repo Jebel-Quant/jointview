@@ -76,23 +76,20 @@ Statistics come from [jQuantStats](https://github.com/jebel-quant/jquantstats), 
 frame carries its period column into `summary` — the annualisation factor is read from
 the spacing of the observations rather than assumed.
 
-```python
-from jointview import demo_frame, line_chart, metrics, summary
+```pycon
+>>> from jointview import demo_frame, line_chart, metrics, summary
 
-frame = demo_frame()
+>>> frame = demo_frame()
 
-table = summary(frame, "balanced", date_col="date")  # a formatted two-column frame
-sharpe = metrics(frame, "tech_fund", date_col="date")["Sharpe ratio"]  # the raw number
-chart = line_chart(frame, "balanced", "tech_fund")  # a plain Altair chart
+>>> table = summary(frame, "balanced", date_col="date")  # a formatted two-column frame
+>>> sharpe = metrics(frame, "tech_fund", date_col="date")["Sharpe ratio"]  # the raw number
+>>> chart = line_chart(frame, "balanced", "tech_fund")  # a plain Altair chart
 
-print(table.columns, table.height, dict(table.iter_rows())["Max drawdown"])
-print(f"{sharpe:.2f}")
-print(type(chart).__name__)
-```
-
-```result
+>>> print(table.columns, table.height, dict(table.iter_rows())["Max drawdown"])
 ['metric', 'value'] 17 -15.90%
+>>> print(f"{sharpe:.2f}")
 0.52
+>>> print(type(chart).__name__)
 LayerChart
 ```
 
