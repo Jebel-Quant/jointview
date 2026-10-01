@@ -113,7 +113,7 @@ the root `.gitignore`, and with no `.env` there is nothing to un-ignore.
 ## What this repo owns, and what it does not
 
 This is a [rhiza](https://github.com/jebel-quant/rhiza)-managed repo, synced from
-template **v1.8.0**. `.rhiza/template.lock` lists every synced path; the `files:` block
+template **v1.9.0**. `.rhiza/template.lock` lists every synced path; the `files:` block
 is generated, so treat it as the authority rather than this table.
 
 **Template-owned — do not edit here.** Changes are made upstream at `jebel-quant/rhiza`
@@ -121,7 +121,7 @@ and arrive via `/rhiza:update`; edits made locally are overwritten by the next s
 
 - `.rhiza/` in its entirety — except `.rhiza/template.yml`, the repo's own pointer at the
   template and the one file the sync will never overwrite
-- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.8.0`,
+- `.github/workflows/*` — thin stubs delegating to the reusable workflows at `@v1.9.0`,
   all of them, on one ref. A `/rhiza:update` moves the refs and `.rhiza/template.lock`
   together.
   **`rhiza_release.yml` is the exception and is now repo-owned**: it is synced whole
