@@ -48,6 +48,15 @@ exclude:
   - .github/workflows/rhiza_conda_recipe.yml
   - .rhiza/scripts/conda_recipe.py
 
+  # Three workflows this repo has no use for. The marimo one runs the notebooks under
+  # MARIMO_FOLDER (docs/notebooks), which does not exist here — the notebook is the
+  # package's own app.py, exercised by the test suite — so it only ever skips. The weekly
+  # fresh-resolve and link check, and the OpenSSF Scorecard, are scheduled jobs this repo
+  # has declined.
+  - .github/workflows/rhiza_marimo.yml
+  - .github/workflows/rhiza_weekly.yml
+  - .github/workflows/rhiza_scorecard.yml
+
   # The template's PAT_TOKEN and release-secret walkthrough. It documents secrets a
   # consumer configures once in the GitHub UI, addressed to whoever set the repo up rather
   # than to anyone reading the tree — and this repo publishes to PyPI by Trusted Publishing,
