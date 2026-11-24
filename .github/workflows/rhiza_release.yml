@@ -12,6 +12,10 @@
 # must therefore be synced directly into each downstream project so that the publish
 # step runs under the correct repository identity.
 #
+# jointview: taken from the template at v1.13.0 with the conda-recipe and devcontainer
+# jobs removed — no feedstock and no .devcontainer here. Excluded from the sync in
+# .rhiza/template.yml, so upstream fixes have to be carried over by hand.
+#
 # Release Workflow for Python Packages
 #
 # This workflow implements a secure, maintainable release pipeline with distinct phases:
@@ -21,7 +25,7 @@
 #   2. 🏗️ Build - Build Python package with Hatch (if [build-system] is defined in pyproject.toml)
 #   3. 📦 Generate SBOM - Create Software Bill of Materials (CycloneDX format)
 #   4. 📝 Draft Release - Create draft GitHub release with build artifacts and SBOM
-#   5. 🚀 Publish to PyPI - Publish package using OIDC or custom feed
+#   5. 🚀 Publish package - PyPI-compatible upload, repository-owned action, or none
 #   6. ✅ Finalize Release - Publish the GitHub release with links
 #
 # 📄 CHANGELOG: not updated here. The release process (rhiza-claude `/release`)
@@ -36,12 +40,15 @@
 #   - Attached to GitHub releases for transparency and compliance
 #   - Skipped if pyproject.toml doesn't exist
 #
-# 🚀 PyPI Publishing:
-#   - Skipped if no dist/ artifacts exist
-#   - Skipped if pyproject.toml contains "Private :: Do Not Upload"
-#   - Uses Trusted Publishing (OIDC) for PyPI (no stored credentials)
-#   - For custom feeds, use PYPI_REPOSITORY_URL and PYPI_TOKEN secrets
-#   - Adds PyPI/custom feed link to GitHub release notes
+# 🚀 Package Publishing:
+#   - RELEASE_PUBLISHER: pypi (default), custom, or none; unknown modes fail closed
+#   - pypi retains the private classifier skip and OIDC/token-based feed support
+#   - custom explicitly permits private distributions and requires the repo-owned
+#     .github/actions/release-publish composite action; no implementation is shipped
+#   - custom receives artifacts-dir, tag, version, and optional opaque credentials
+#   - the action uploads already-built distributions, not provenance, and may return
+#     artifact-url (one public credential-free HTTPS URL) for the release notes
+#   - required downloads and failed uploads fail the release; none skips package upload
 #
 # 🔐 Security:
 #   - No PyPI credentials stored; relies on Trusted Publishing via GitHub OIDC
@@ -50,7 +57,10 @@
 #   - SBOM attestations generated for supply chain transparency (public repos only)
 #
 # 📄 Requirements:
-#   - pyproject.toml with top-level version field (for Python packages)
+#   - pyproject.toml declaring a version (for Python packages): either written as
+#     `[project].version`, or listed in `[project].dynamic` for the build backend to
+#     derive from the VCS (hatch-vcs, setuptools-scm). A derived version is checked
+#     against the tag on the built distribution rather than in the file.
 #   - Package registered on PyPI as Trusted Publisher (for PyPI publishing)
 #
 # ✅ To Trigger:
@@ -75,11 +85,15 @@ on:
         required: true
         type: string
     secrets:
+      RHIZA_SETUP_CREDENTIALS:
+        required: false
       GH_PAT:
         required: false
       UV_EXTRA_INDEX_URL:
         required: false
       PYPI_TOKEN:
+        required: false
+      RELEASE_PUBLISH_CREDENTIALS:
         required: false
 
 # Queue runs instead of cancelling: a release or sync must never be
@@ -93,6 +107,12 @@ concurrency:
 permissions:
   contents: read
 
+# The CLI the build job validates distributions with (`dist-check`). Pinned like every other
+# workflow's RHIZA_TASK, and moved with them by the same Renovate rule, so the release and CI
+# run one version of the check rather than two.
+env:
+  RHIZA_TASK: rhiza-task@1.10.0
+
 jobs:
   tag:
     name: Validate Tag
@@ -103,7 +123,7 @@ jobs:
       tag: ${{ steps.set_tag.outputs.tag }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           egress-policy: audit
 
@@ -114,11 +134,17 @@ jobs:
 
       - name: Set Tag Variable
         id: set_tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [[ -n "${{ inputs.tag }}" ]]; then
-            TAG="${{ inputs.tag }}"
+          if [[ -n "$INPUT_TAG" ]]; then
+            TAG="$INPUT_TAG"
           else
             TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+(\.[0-9]+)*([a-zA-Z0-9.+-]*)$ ]]; then
+            echo "::error::Invalid release tag"
+            exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
@@ -233,21 +259,49 @@ jobs:
       contents: read
       id-token: write       # OIDC for attestation signing
       attestations: write   # SLSA provenance + SBOM attestations (public repos only)
+    outputs:
+      buildable: ${{ steps.buildable.outputs.buildable }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           egress-policy: audit
 
       - name: Checkout Code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
+          ref: refs/tags/${{ needs.tag.outputs.tag }}
           fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           version: "0.11.16"
+
+      - name: Validate consumer dependency setup
+        if: ${{ vars.RHIZA_SETUP_ENABLED == 'true' }}
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          CALLER_REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request_target" ] ||
+             { [ "$EVENT_NAME" = "pull_request" ] && [ "$HEAD_REPOSITORY" != "$CALLER_REPOSITORY" ]; }; then
+            echo "::error::Consumer setup is not allowed on fork pull requests or pull_request_target."
+            exit 1
+          fi
+          if [ ! -f .github/actions/rhiza-setup/action.yml ] && [ ! -f .github/actions/rhiza-setup/action.yaml ]; then
+            echo "::error::RHIZA_SETUP_ENABLED=true requires .github/actions/rhiza-setup/action.yml or action.yaml."
+            exit 1
+          fi
+
+      - name: Run consumer dependency setup
+        if: ${{ vars.RHIZA_SETUP_ENABLED == 'true' }}
+        uses: ./.github/actions/rhiza-setup
+        with:
+          purpose: ${{ github.job }}
+          credentials: ${{ secrets.RHIZA_SETUP_CREDENTIALS }}
 
       - name: Configure git auth for private packages
         uses: jebel-quant/actions/configure-git-auth@6d52725ca371d609489c5b50236965ad70bbe528 # v1
@@ -256,16 +310,47 @@ jobs:
 
       - name: Verify version matches tag
         if: hashFiles('pyproject.toml') != ''
+        env:
+          # Read from the environment, not interpolated into the script: that is what
+          # lets tests/api/test_release_version_verification.py run this exact shell
+          # against purpose-built projects instead of asserting on the step's name.
+          TAG: ${{ needs.tag.outputs.tag }}
         run: |
-          TAG_VERSION="${{ needs.tag.outputs.tag }}"
-          TAG_VERSION=${TAG_VERSION#v}
-          PROJECT_VERSION=$(uv version --short)
+          TAG_VERSION="${TAG#v}"
 
           # Normalize tag version to PEP 440 format for comparison.
           # Tags use semver format (e.g., 0.11.1-beta.1) while uv version --short
           # returns PEP 440 normalized format (e.g., 0.11.1b1).
           NORMALIZED_TAG=$(uv run --with packaging --no-project python3 -c "from packaging.version import Version; print(Version('$TAG_VERSION'))")
 
+          # A project may derive its version from the VCS rather than write one: PEP 621's
+          # `dynamic = ["version"]` with a backend plugin such as hatch-vcs. There is then
+          # no number in the file to compare, and `uv version --short` does not return a
+          # differing one -- it exits 2 ("We cannot get or set dynamic project versions"),
+          # which would fail every release of such a project. The tag-versus-version check
+          # moves to "Verify built distribution matches the tag" below, which is where a
+          # derived version can actually be wrong.
+          DYNAMIC=$(uv run --with tomli --no-project python3 -c "
+          import pathlib, tomli
+          project = tomli.loads(pathlib.Path('pyproject.toml').read_text()).get('project') or {}
+          print('dynamic' if 'version' in (project.get('dynamic') or []) else 'written')")
+
+          case "$DYNAMIC" in
+            dynamic)
+              echo "[project].version is dynamic: derived from the VCS, so there is no written number to compare against $NORMALIZED_TAG. The distribution built below is checked against the tag instead."
+              exit 0
+              ;;
+            written)
+              ;;
+            *)
+              # Never assume "written": that would call `uv version --short` on a dynamic
+              # project and fail with an error about the probe, not about the release.
+              echo "::error::Could not tell whether [project].version is written or dynamic (probe returned '$DYNAMIC')"
+              exit 1
+              ;;
+          esac
+
+          PROJECT_VERSION=$(uv version --short)
           if [[ "$PROJECT_VERSION" != "$NORMALIZED_TAG" ]]; then
             echo "::error::Version mismatch: pyproject.toml has '$PROJECT_VERSION' but tag is '$NORMALIZED_TAG' (from tag '$TAG_VERSION')"
             exit 1
@@ -281,11 +366,64 @@ jobs:
             echo "buildable=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build
+      - name: Build and validate distributions
         if: steps.buildable.outputs.buildable == 'true'
+        env:
+          UV_EXTRA_INDEX_URL: ${{ secrets.UV_EXTRA_INDEX_URL || env.UV_EXTRA_INDEX_URL }}
+        # `dist-check` builds into dist/ and then reads the artifacts back before anything is
+        # uploaded (#1743): every declared licence file must be in each archive and recorded as
+        # a License-File, and a wheel rebuilt from the sdist -- outside the checkout, with
+        # version overrides removed -- must agree with the rest. dist/ is left holding exactly
+        # what passed, and that folder is what the jobs below publish; nothing rebuilds it.
+        # `--strict`, because a skip here would mean nothing was built, and an empty dist/
+        # must not reach the publish job as a pass.
+        run: uvx "$RHIZA_TASK" dist-check --strict
+
+      - name: Verify built distribution matches the tag
+        if: steps.buildable.outputs.buildable == 'true'
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
         run: |
-          printf "[INFO] Building package...\n"
-          uv build
+          # The only place a version *derived* from the VCS can be caught being wrong.
+          # hatch-vcs and setuptools-scm fall back rather than fail, so a checkout that
+          # cannot see the tag builds `0.1.dev1+g<sha>` and publishes it under a green
+          # tick with no error anywhere -- which is why the checkout above uses
+          # fetch-depth: 0. Runs for a written version too: it costs one filename parse
+          # and closes the gap between what the step above read and what `uv build`
+          # actually produced.
+          TAG_VERSION="${TAG#v}"
+          uv run --with packaging --no-project python3 -c '
+          import pathlib
+          import sys
+
+          from packaging.utils import parse_sdist_filename, parse_wheel_filename
+          from packaging.version import Version
+
+          expected = Version(sys.argv[1])
+          dist = pathlib.Path("dist")
+          built = sorted(dist.glob("*.whl")) + sorted(dist.glob("*.tar.gz"))
+          if not built:
+              print("::error::uv build produced no distribution in dist/ -- there is nothing to publish or verify")
+              sys.exit(1)
+
+          mismatched = []
+          for artifact in built:
+              parse = parse_wheel_filename if artifact.name.endswith(".whl") else parse_sdist_filename
+              found = parse(artifact.name)[1]
+              print(f"{artifact.name}: {found}")
+              if found != expected:
+                  mismatched.append(f"{artifact.name} carries {found}")
+
+          if mismatched:
+              print(
+                  f"::error::Built distribution does not carry the release version {expected}: "
+                  + ", ".join(mismatched)
+                  + ". A version derived from the VCS falls back to a dev version when the tag "
+                  "is not visible to the build -- check the checkout depth and that tags were fetched."
+              )
+              sys.exit(1)
+          print(f"Built distribution verified at {expected}")
+          ' "$TAG_VERSION"
 
       - name: Install Python for SBOM generation
         if: hashFiles('pyproject.toml') != ''
@@ -295,8 +433,9 @@ jobs:
 
       - name: Sync environment for SBOM generation
         if: hashFiles('pyproject.toml') != ''
+        env:
+          UV_EXTRA_INDEX_URL: ${{ secrets.UV_EXTRA_INDEX_URL || env.UV_EXTRA_INDEX_URL }}
         run: |
-          export UV_EXTRA_INDEX_URL="${{ secrets.UV_EXTRA_INDEX_URL }}"
           uv sync --all-extras --all-groups --frozen
 
       - name: Generate SBOM (CycloneDX)
@@ -327,7 +466,9 @@ jobs:
         # otherwise ship releases without any signature asset, which fails
         # OpenSSF Scorecard's Signed-Releases check.
         if: hashFiles('pyproject.toml') != '' && github.event.repository.private == false
-        run: cp "${{ steps.attest-sbom.outputs.bundle-path }}" sbom.cdx.json.sigstore.json
+        env:
+          BUNDLE_PATH: ${{ steps.attest-sbom.outputs.bundle-path }}
+        run: cp "$BUNDLE_PATH" sbom.cdx.json.sigstore.json
 
       - name: Upload SBOM artifacts
         if: hashFiles('pyproject.toml') != ''
@@ -351,7 +492,9 @@ jobs:
         # signature asset (*.intoto.jsonl) so consumers — and OpenSSF
         # Scorecard's Signed-Releases check — can verify the artifacts.
         if: steps.buildable.outputs.buildable == 'true' && github.event.repository.private == false
-        run: cp "${{ steps.provenance.outputs.bundle-path }}" dist/provenance.intoto.jsonl
+        env:
+          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
+        run: cp "$BUNDLE_PATH" dist/provenance.intoto.jsonl
 
       - name: Upload dist artifact
         if: steps.buildable.outputs.buildable == 'true'
@@ -370,13 +513,14 @@ jobs:
 
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           egress-policy: audit
 
       - name: Checkout Code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
+          ref: refs/tags/${{ needs.tag.outputs.tag }}
           fetch-depth: 0
 
       - name: Install uv
@@ -396,11 +540,11 @@ jobs:
       - name: Download dist artifact
         # Brings in provenance.intoto.jsonl (and the built distributions) staged
         # by the build job, so the SLSA provenance ships as a release asset.
+        if: needs.build.outputs.buildable == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist
-        continue-on-error: true
 
       - name: Create GitHub Release with artifacts
         uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
@@ -414,111 +558,138 @@ jobs:
 
   # Decide at step-level whether to publish
   pypi:
-    name: Publish to PyPI
+    name: Publish package
     runs-on: ubuntu-latest
     environment: release
     needs: [tag, build, draft-release]
     permissions:
       contents: read
-      id-token: write   # OIDC Trusted Publishing to PyPI (no stored credentials)
+      id-token: write   # PyPI or the explicitly selected repository-owned publisher
     outputs:
-      should_publish: ${{ steps.check_dist.outputs.should_publish }}
+      should_publish: ${{ steps.publisher.outputs.should_publish }}
+      public_pypi: ${{ steps.publisher.outputs.public_pypi }}
+      publisher: ${{ steps.publisher.outputs.publisher }}
+      artifact_url: ${{ steps.artifact_url.outputs.artifact_url }}
 
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           egress-policy: audit
 
       - name: Checkout Code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
+          ref: refs/tags/${{ needs.tag.outputs.tag }}
+          persist-credentials: false
           fetch-depth: 0
 
+      - name: Checkout publisher guards
+        # Independent of the caller's release tag: old tags need not contain helpers.
+        # Upgrade only to an already-published immutable script revision, never a future release tag.
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: jebel-quant/rhiza
+          ref: 3819c35933d428626076e87345de59b81bb161ed
+          path: .rhiza-release-tools
+          sparse-checkout: bundles/github/.rhiza/scripts
+          persist-credentials: false
+
+      - name: Validate publisher configuration
+        id: publisher
+        env:
+          RELEASE_PUBLISHER: ${{ vars.RELEASE_PUBLISHER }}
+          PYPI_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
+          BUILDABLE: ${{ needs.build.outputs.buildable }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          python3 .rhiza-release-tools/bundles/github/.rhiza/scripts/release_publish.py validate-publisher
+
       - name: Download dist artifact
+        if: steps.publisher.outputs.should_publish == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
-          path: dist
-        # Continue if dist folder is not found. Don't fail the job.
-        continue-on-error: true
+          path: ${{ github.workspace }}/release-dist
 
-      - name: Check if dist contains artifacts and not marked as private
-        id: check_dist
+      - name: Require built distributions
+        if: steps.publisher.outputs.should_publish == 'true'
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/release-dist
         run: |
-          if [[ ! -d dist ]]; then
-            echo "::warning::No folder dist/. Skipping PyPI publish."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-          else
-            if grep -R "Private :: Do Not Upload" pyproject.toml; then
-              echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-          cat "$GITHUB_OUTPUT"
+          python3 .rhiza-release-tools/bundles/github/.rhiza/scripts/release_publish.py require-distributions
 
       - name: Remove non-distribution files before publish
-        # The dist artifact also carries the SLSA provenance bundle (staged for
-        # the GitHub release). twine/pypi-publish rejects it as an unknown
-        # distribution format, so strip it here before publishing.
-        if: ${{ steps.check_dist.outputs.should_publish == 'true' }}
-        run: rm -f dist/*.intoto.jsonl
+        # The provenance belongs to the GitHub release, not the package index.
+        if: steps.publisher.outputs.should_publish == 'true' && steps.publisher.outputs.publisher == 'pypi'
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/release-dist
+        run: rm -f "$ARTIFACTS_DIR"/*.intoto.jsonl
 
-      # this should not take place, as "Private :: Do Not Upload" set in pyproject.toml
-      # repository-url and password only used for custom feeds, not for PyPI with OIDC
       - name: Publish to PyPI
-        if: ${{ steps.check_dist.outputs.should_publish == 'true' }}
+        if: steps.publisher.outputs.should_publish == 'true' && steps.publisher.outputs.publisher == 'pypi'
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
-          packages-dir: dist/
+          packages-dir: ${{ github.workspace }}/release-dist/
           skip-existing: true
           repository-url: ${{ vars.PYPI_REPOSITORY_URL }}
           password: ${{ secrets.PYPI_TOKEN }}
 
+      - name: Publish with repository action
+        id: custom_publish
+        if: steps.publisher.outputs.should_publish == 'true' && steps.publisher.outputs.publisher == 'custom'
+        uses: ./.github/actions/release-publish
+        env:
+          # Composite metadata cannot read vars; pass non-secret publisher configuration.
+          RHIZA_RELEASE_PUBLISH_VARS: ${{ toJSON(vars) }}
+        with:
+          artifacts-dir: ${{ github.workspace }}/release-dist
+          tag: ${{ needs.tag.outputs.tag }}
+          version: ${{ steps.publisher.outputs.version }}
+          credentials: ${{ secrets.RELEASE_PUBLISH_CREDENTIALS }}
+
+      - name: Validate publisher artifact URL
+        id: artifact_url
+        if: steps.publisher.outputs.should_publish == 'true' && steps.publisher.outputs.publisher == 'custom'
+        env:
+          ARTIFACT_URL: ${{ steps.custom_publish.outputs.artifact-url }}
+        run: |
+          python3 .rhiza-release-tools/bundles/github/.rhiza/scripts/release_publish.py validate-artifact-url
 
   finalise-release:
     name: Finalise Release
     runs-on: ubuntu-latest
-    needs: [tag, pypi]
-    if: needs.pypi.result == 'success'
+    needs: [tag, build, draft-release, pypi]
+    # Every dependency must succeed: a failed upload leaves the release as a draft.
+    # !cancelled() keeps upstream's guard against finalising a cancelled run (#1537);
+    # with the conda and devcontainer jobs removed there is no optional job left.
+    # Disabled uploads (RELEASE_PUBLISHER=none) complete their job successfully.
+    if: ${{ !cancelled() && needs.tag.result == 'success' && needs.build.result == 'success' && needs.draft-release.result == 'success' && needs.pypi.result == 'success' }}
     permissions:
       contents: write   # Needed to undraft/publish the GitHub release
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         with:
           egress-policy: audit
 
       - name: Checkout Code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
+          ref: refs/tags/${{ needs.tag.outputs.tag }}
           fetch-depth: 0
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
-        with:
-          version: "0.11.16"
-
-      - name: "Sync the virtual environment for ${{ github.repository }}"
-        shell: bash
-        run: |
-          export UV_EXTRA_INDEX_URL="${{ secrets.uv_extra_index_url }}"
-          # will just use .python-version?
-          uv sync --all-extras --all-groups --frozen
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
 
       - name: Generate PyPI Link
         id: pypi_link
-        if: needs.pypi.outputs.should_publish == 'true' && needs.pypi.result == 'success'
+        if: needs.pypi.outputs.should_publish == 'true' && needs.pypi.outputs.publisher == 'pypi' && needs.pypi.result == 'success'
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
+          REPO_URL: ${{ vars.PYPI_REPOSITORY_URL }}
         run: |
-          PACKAGE_NAME=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['name'])")
-          VERSION="${{ needs.tag.outputs.tag }}"
+          PACKAGE_NAME=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['name'])")
+          VERSION="$TAG"
           VERSION=${VERSION#v}
 
-          REPO_URL="${{ vars.PYPI_REPOSITORY_URL || '' }}"
           if [ -z "$REPO_URL" ]; then
              LINK="https://pypi.org/project/$PACKAGE_NAME/$VERSION/"
              NAME="PyPI Package"
@@ -535,11 +706,24 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Generate Custom Publisher Link
+        id: custom_link
+        if: needs.pypi.outputs.publisher == 'custom' && needs.pypi.result == 'success' && needs.pypi.outputs.artifact_url != ''
+        env:
+          ARTIFACT_URL: ${{ needs.pypi.outputs.artifact_url }}
+        run: |
+          {
+            echo "message<<EOF"
+            printf '### Published Package\n\n<%s>\n' "$ARTIFACT_URL"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.tag.outputs.tag }}
           PYPI_MSG: ${{ steps.pypi_link.outputs.message }}
+          CUSTOM_MSG: ${{ steps.custom_link.outputs.message }}
         run: |
           # Get existing auto-generated release notes (gracefully handle missing release)
           EXISTING=$(gh release view "$TAG" --json body --jq '.body // ""' 2>/dev/null || echo "")
@@ -547,7 +731,11 @@ jobs:
           # Append links to release body
           {
             printf '%s' "$EXISTING"
-            [ -n "$PYPI_MSG" ] && printf '\n\n%s' "$PYPI_MSG"
-          } > /tmp/notes.md
+            for message in "$PYPI_MSG" "$CUSTOM_MSG"; do
+              if [ -n "$message" ]; then
+                printf '\n\n%s' "$message"
+              fi
+            done
+          } > release-notes.md
 
-          gh release edit "$TAG" --draft=false --notes-file /tmp/notes.md
+          gh release edit "$TAG" --draft=false --notes-file release-notes.md
