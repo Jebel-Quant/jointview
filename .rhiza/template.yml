@@ -41,6 +41,13 @@ exclude:
   # release pipeline: check the template's version by hand when one lands.
   - .github/workflows/rhiza_release.yml
 
+  # The conda-recipe workflow and the script it runs, new in v1.13.0. They generate a
+  # grayskull recipe for a conda-forge feedstock, and this repo has none — the same reason
+  # the release workflow above lost its conda job. The script has no other caller, so it
+  # goes with the workflow.
+  - .github/workflows/rhiza_conda_recipe.yml
+  - .rhiza/scripts/conda_recipe.py
+
   # The template's PAT_TOKEN and release-secret walkthrough. It documents secrets a
   # consumer configures once in the GitHub UI, addressed to whoever set the repo up rather
   # than to anyone reading the tree — and this repo publishes to PyPI by Trusted Publishing,
